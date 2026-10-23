@@ -10,7 +10,7 @@ The brief is large. Before writing code, these are the decisions that shape ever
 | D2 | How many edge types? | Two primary edge types: `parent_child` (directed) and `partnership` (undirected, stored with the two ids in sorted order). Each carries a **subtype** (biological / adoptive / step / foster / guardian / unknown; marriage / customary marriage / civil union / partnership …) and a **verification** state. | Genealogy is not a binary tree. A child can have more than two parental links (birth parents + adoptive parents + step-parent), and a person can have several partnerships. Two edge types with subtypes cover every case in the brief without special-casing. |
 | D3 | What is a "generation"? | `generation(founder) = 1`; `generation(child) = generation(parent) + 1`, computed **only** over `parent_child` edges that are `verified` and whose subtype is in the family's *descent policy* (default: biological + adoptive). Never entered by hand. | Matches the brief's rules 1–3 and 8. Spouses who married in are not reachable over descent edges, so they are never assigned a descendant generation. Adoptive descent is included by default because most families regard an adopted child as part of the line; families can turn it off. |
 | D4 | What happens when two paths give different generation numbers (e.g. cousin marriage across generations)? | The person is marked `conflict` with the **candidate numbers**, the conflict propagates to their descendants, and a review item is raised. An administrator can pin a resolution, which is audited. | Rule 7: never silently assign. See [04-GENERATION-ENGINE.md](04-GENERATION-ENGINE.md). |
-| D5 | Where do generation numbers live? | Denormalised onto each person (`generation.number`, `generation.status`) and recomputed by a **background job** (BullMQ) after any change to descent edges or the founder. Small families are recomputed inline in the same request. | Reading generation numbers is extremely frequent (tree, search, dashboard); writing them is rare. Recalculation is O(V + E) and takes milliseconds for thousands of people, but a family of 100 000 should not block an HTTP request. |
+| D5 | Where do generation numbers live? | Denormalised onto each person (`generation.number`, `generation.status`) and recomputed in the API process (in the background for large families) after any change to descent edges or the founder. Small families are recomputed inline in the same request. | Reading generation numbers is extremely frequent (tree, search, dashboard); writing them is rare. Recalculation is O(V + E) and takes milliseconds for thousands of people, but a family of 100 000 should not block an HTTP request. |
 | D6 | Users vs. people | **Authentication accounts (`users`) are completely separate from genealogy profiles (`family_members`).** A `family_memberships` document links a user to a family with a role and, optionally, to the profile they have *claimed* after verification. | Most people in a family tree are deceased or never sign up. A user may belong to many families with different roles. Profiles are never merged or linked automatically by name. |
 | D7 | Roles | Platform role on the user (`super_admin` or `user`). Family role on the membership (`family_admin`, `family_moderator`, `family_member`). "Guest" is the absence of a membership. Permissions are a static matrix in `@fh/contracts`, shared by backend and frontend. Moderators may be restricted to a set of branches. | One source of truth. The frontend uses the matrix only to hide controls; **the backend enforces every check**. |
 | D8 | Can super administrators read private family data? | **No.** Platform administration endpoints expose account and family *registration* metadata and aggregate counts, never member records. A super admin who also needs to see a family must be invited to it like anyone else. | Explicit requirement in §3. |
@@ -42,27 +42,24 @@ The brief is large. Before writing code, these are the decisions that shape ever
                 ┌──────────────▼───────────────┐
                 │ Express API (Node 22, TS)     │──────► Object storage (S3-compatible)
                 │  helmet · rate-limit · zod    │
-                │  auth · RBAC · audit          │──────► SMTP (via e-mail queue)
-                └──────┬────────────────┬───────┘
-                       │                │ enqueue
-               ┌───────▼──────┐   ┌─────▼────────┐    ┌──────────────────┐
-               │ MongoDB      │   │ Redis         │◄──│ Worker process    │
-               │ (replica set)│◄──│ cache · rate  │   │ BullMQ: e-mail,   │
-               └──────────────┘   │ limits · jobs │   │ generation recalc,│
-                       ▲          └───────────────┘   │ media processing  │
-                       └──────────────────────────────┴──────────────────┘
+                │  auth · RBAC · audit          │──────► SMTP (sent directly, with retries)
+                │  generation recalculation     │
+                └──────────────┬───────────────┘
+                       ┌───────▼──────┐
+                       │ MongoDB      │
+                       │ (replica set)│
+                       └──────────────┘
 ```
 
 * **MongoDB must run as a replica set** (a single-node replica set is fine for development) because multi-document transactions are used, e.g. creating a person and their parent edge atomically.
-* **Redis is optional in development** (rate limits fall back to in-memory, e-mail is sent inline) and **required in production** (`NODE_ENV=production` refuses to start without it), so that rate limits are shared across instances and long jobs do not run inside HTTP requests.
-* The API is stateless; it scales horizontally behind a load balancer. The worker is the same codebase started with a different entry point (`dist/worker.js`).
+* **No Redis and no worker.** One API process does everything: rate limits are counted in its memory, e-mail is sent straight to SMTP in the background (retried a few times), and generation numbers are recalculated in the request (or, for families over `GENERATION_INLINE_LIMIT`, in the background just after it). Run a single API instance.
 
 ## 1.3 Folder structure
 
 ```
 family_tree/
 ├── package.json                 npm workspaces + root scripts
-├── docker-compose.yml           MongoDB (replica set) + Redis + MailPit for local dev
+├── docker-compose.yml           MongoDB (replica set) + MailPit for local dev
 ├── docs/                        this documentation
 ├── contracts/                   @fh/contracts — shared by backend and frontend
 │   └── src/
@@ -79,10 +76,9 @@ family_tree/
 │   ├── src/
 │   │   ├── app.ts               express app factory (no listen; used by tests)
 │   │   ├── server.ts            HTTP entry point
-│   │   ├── worker.ts            BullMQ worker entry point
 │   │   ├── config/env.ts        zod-validated environment
 │   │   ├── core/                errors, response helpers, logger, crypto, pagination
-│   │   ├── infra/               mongo, redis, queues, mailer
+│   │   ├── infra/               mongo, mailer, e-mail dispatcher, storage
 │   │   ├── middleware/          request id, auth, csrf, rate limit, validate, authorize, errors
 │   │   ├── modules/
 │   │   │   ├── auth/            routes · controller · service · validators · session model · tokens

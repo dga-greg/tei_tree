@@ -2,7 +2,6 @@ import path from 'node:path';
 import { loadEnv } from './config/env.js';
 import { createLogger } from './core/logger.js';
 import { connectMongo, disconnectMongo, syncIndexes } from './infra/mongo.js';
-import { createRedis } from './infra/redis.js';
 import { LogMailer, SmtpMailer } from './infra/mailer.js';
 import { createApp } from './app.js';
 
@@ -11,16 +10,13 @@ async function main(): Promise<void> {
   const logger = createLogger(env.LOG_LEVEL, env.NODE_ENV === 'development');
 
   await connectMongo(env.MONGODB_URI, logger);
-  const redis = env.REDIS_URL ? createRedis(env.REDIS_URL, logger, env.REDIS_TLS_VERIFY) : undefined;
   if (env.NODE_ENV === 'production' && env.ALLOW_INSECURE_HTTP) {
     logger.warn('ALLOW_INSECURE_HTTP is set: plain-HTTP origin and non-secure cookies are allowed. Never use this on a public server.');
   }
-  if (!redis) logger.warn('REDIS_URL not set: using in-memory rate limits and inline e-mail delivery (development only)');
 
   const { app, close } = createApp({
     env,
     logger,
-    redis,
     mailer: env.SMTP_URL ? new SmtpMailer(env.SMTP_URL, env.MAIL_FROM) : new LogMailer(logger),
   });
   await syncIndexes(logger);
@@ -30,7 +26,6 @@ async function main(): Promise<void> {
     logger.info({ signal }, 'Shutting down');
     server.close(async () => {
       await close();
-      await redis?.quit();
       await disconnectMongo();
       process.exit(0);
     });

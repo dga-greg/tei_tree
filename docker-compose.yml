@@ -13,10 +13,6 @@ services:
       timeout: 10s
       retries: 20
 
-  redis:
-    image: redis:7-alpine
-    ports: ['6379:6379']
-
   mailpit:
     # Catches outgoing e-mail; open http://localhost:8025 to read password-reset messages.
     image: axllent/mailpit:latest

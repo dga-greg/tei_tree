@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import { AppError } from '../../core/errors.js';
 import { randomToken, safeEqual } from '../../core/crypto.js';
 import type { Logger } from '../../core/logger.js';
-import type { EmailDispatcher } from '../../infra/queues.js';
+import type { EmailDispatcher } from '../../infra/email-dispatcher.js';
 import { UserModel, type UserDoc } from '../users/user.model.js';
 import { googleLinkedEmail } from './auth.emails.js';
 import type { AuthService, ClientMeta, SignInOutcome } from './auth.service.js';

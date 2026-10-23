@@ -41,7 +41,7 @@ reports show only what was reported).
 `X-Powered-By`, no CORS headers (the SPA and API share an origin). HSTS is expected from the TLS terminator in
 front of the web container.
 
-**Rate limiting** — global, credential, upload and file-link limiters, Redis-backed in production.
+**Rate limiting** — global, credential, upload and file-link limiters, counted in the memory of the single API process.
 
 **Data protection** — personal-data export and account deletion; family deletion with a grace period and a
 purge that erases records and stored files; removed files are erased after the retention period.

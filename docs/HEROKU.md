@@ -1,23 +1,21 @@
 # Running on Heroku
 
 One Heroku app runs the whole site at one address: the API also serves the web pages (`WEB_DIST_DIR`), so sign-in
-cookies and CSRF protection work exactly as on the Docker setup. A second process, the **worker**, sends e-mails
-and makes family books and transcripts.
+cookies and CSRF protection work exactly as on the Docker setup. There is no second process and no Redis: e-mails
+are sent and generation numbers recalculated by the same process, straight after each request.
 
 What you need (and keep using from your local setup):
 
 | Piece | Service | Cost (roughly) |
 |---|---|---|
 | Web process (site + API) | Heroku **Basic** dyno | $7/month |
-| Worker process | Heroku **Basic** dyno | $7/month |
-| Redis (queues, rate limits) | [Upstash](https://upstash.com) free tier, or Heroku Key-Value Store | free / from $3 |
 | Database | MongoDB Atlas | free tier to start |
 | Photos and files | Cloudflare R2 | free up to 10 GB |
 | E-mail | Resend | free up to 3 000/month |
 | Your own domain (optional) | any registrar | ~$10–15/year |
 
-Eco dynos ($5 for a pool of hours) sleep after 30 minutes without visits, and reminders and e-mails then wait, so
-use Basic.
+Eco dynos ($5 for a pool of hours) sleep after 30 minutes without visits, so the first visit after a quiet spell is
+slow; Basic does not sleep.
 
 ## 1. Create the app
 
@@ -29,18 +27,7 @@ heroku create mensah-family          # pick your own name; the site will be http
 heroku buildpacks:set heroku/nodejs
 ```
 
-## 2. Redis
-
-Easiest is **Upstash** (free): create a Redis database, copy its `rediss://…` URL, then:
-
-```bash
-heroku config:set REDIS_URL='rediss://default:PASSWORD@HOST.upstash.io:6379'
-```
-
-Or Heroku's own: `heroku addons:create heroku-redis:mini` (sets `REDIS_URL` itself), and then
-`heroku config:set REDIS_TLS_VERIFY=false`, because its certificate is self-signed (the connection is still encrypted).
-
-## 3. Settings
+## 2. Settings
 
 Replace every value in capitals; the rest can stay. Secrets: make each with `openssl rand -hex 32`.
 
@@ -75,21 +62,21 @@ Optional, as on your laptop: `IDLE_TIMEOUT_MINUTES` (sign-out after this long wi
 **MongoDB Atlas:** Heroku's addresses change, so in Atlas → Network Access allow `0.0.0.0/0` (access is still
 protected by the database user and password), or use a fixed-IP add-on.
 
-## 4. Deploy
+## 3. Deploy
 
 ```bash
 git push heroku claude/eloquent-newton-q2l07l:main
-heroku ps:scale web=1:basic worker=1:basic
+heroku ps:scale web=1:basic
 heroku logs --tail
 ```
 
 The build installs everything, builds the shared types, the API and the web app (`heroku-postbuild`), then starts
-`web` and `worker` from the `Procfile`. Look for `API listening` and `Worker started` in the logs. Then open
+`web` from the `Procfile`. Look for `API listening` in the logs. Then open
 `https://mensah-family.herokuapp.com`.
 
 To deploy a new version later: `git pull`, then the same `git push heroku …` line.
 
-## 5. First administrator
+## 4. First administrator
 
 ```bash
 heroku run 'SUPER_ADMIN_PASSWORD="a long password" node backend/dist/scripts/create-super-admin.js --email you@example.org --name "Your Name"'
@@ -97,7 +84,7 @@ heroku run 'SUPER_ADMIN_PASSWORD="a long password" node backend/dist/scripts/cre
 
 Sign in, then turn on two-step sign-in in Settings → Security (the administration pages need it).
 
-## 6. Your own domain (optional)
+## 5. Your own domain (optional)
 
 ```bash
 heroku domains:add family.example.org
@@ -109,7 +96,11 @@ At your domain registrar, point `family.example.org` (a CNAME record) to the DNS
 
 ## Good to know
 
+- **One web dyno:** rate limits are counted in the dyno's memory, so keep it at one web dyno (plenty for a family
+  register). An app moved from an older setup can drop its worker and Redis: `heroku ps:scale worker=0`, then remove
+  the Redis add-on or `heroku config:unset REDIS_URL REDIS_TLS_VERIFY`.
+
 - **Uploads:** Heroku ends any request that takes more than 30 seconds, so very large videos on slow connections can
   fail; photos and documents are fine.
 - **Backups:** turn on Atlas backups; R2 keeps the files.
-- **Costs grow** with use only through Atlas, R2 and Resend tiers. The two Basic dynos are fixed.
+- **Costs grow** with use only through Atlas, R2 and Resend tiers. The Basic dyno is fixed.

@@ -25,7 +25,6 @@ import {
 } from '../archive/archive.shared.js';
 import { FamilyMediaModel, type FamilyMediaDoc } from './media.model.js';
 import { processImage, receiveUpload, sniff } from './media.upload.js';
-import { mediaSearchText, type TranscriptionService } from './transcription.service.js';
 
 /**
  * Same-origin link that checks permission, then redirects to a short-lived signed file URL. `ngsw-bypass` keeps
@@ -93,16 +92,7 @@ const box = z
   .strict()
   .refine((b) => b.x + b.w <= 1.0001 && b.y + b.h <= 1.0001, 'The box must lie within the photo');
 export const tagsBody = z.object({ version: z.number().int().min(0), tags: z.array(z.object({ memberId: objectId, box }).strict()).max(100) }).strict();
-const language = z.string().trim().max(60);
-export const transcriptBody = z
-  .object({
-    version: z.number().int().min(0),
-    text: z.string().trim().max(200_000),
-    language: language.optional(),
-    translation: z.object({ text: z.string().trim().max(200_000), language }).strict().nullable().optional(),
-  })
-  .strict();
-export const transcribeBody = z.object({ translate: z.boolean().default(false) }).strict();
+
 
 export const mediaListQuery = z.object({
   kind: z.enum(['photo', 'document', 'audio', 'video']).optional(),
@@ -136,11 +126,6 @@ export class MediaService {
   private profiles: ProfilePhotos | null = null;
   attachProfiles(p: ProfilePhotos): void {
     this.profiles = p;
-  }
-
-  private transcription: TranscriptionService | null = null;
-  attachTranscription(t: TranscriptionService): void {
-    this.transcription = t;
   }
 
   private canEdit(access: FamilyAccess, m: Pick<FamilyMediaDoc, 'uploadedBy'>): boolean {
@@ -350,7 +335,7 @@ export class MediaService {
     if (patch.eventId !== undefined) m.eventId = await this.assertEvent(access, patch.eventId);
     if (patch.privacy !== undefined) m.privacy = patch.privacy;
     if (patch.provenance !== undefined) m.set('provenance', { ...(m.provenance ?? {}), ...patch.provenance });
-    m.searchText = mediaSearchText(m);
+    m.searchText = searchTextOf(m.title, m.description, m.originalName);
     await m.save();
     if (m.privacy === 'admins') await this.unsetProfilePhotos(access, m._id);
     await this.audit.record({ familyId: access.familyId, actorId: actor.userId, actorRole: access.role, action: 'media.update', targetType: 'media', targetId: m._id, before, after: m.toObject(), requestId: actor.requestId, ip: actor.ip });
@@ -380,43 +365,6 @@ export class MediaService {
     for (const memberId of ids) if (!people.has(memberId.toString())) m.memberIds.push(memberId);
     await m.save();
     await this.audit.record({ familyId: access.familyId, actorId: actor.userId, actorRole: access.role, action: 'media.tags', targetType: 'media', targetId: m._id, before: { tags: before }, after: { tags: m.tags }, requestId: actor.requestId, ip: actor.ip });
-    return this.view(access, m._id);
-  }
-
-  /** A transcript typed (or corrected) by hand. An empty text removes the transcript. */
-  async setTranscript(access: FamilyAccess, actor: Actor, id: Types.ObjectId, body: z.output<typeof transcriptBody>): Promise<MediaView> {
-    const m = await this.editable(access, id, body.version);
-    if (m.kind !== 'audio' && m.kind !== 'video') throw new AppError('VALIDATION_FAILED', 'Only recordings and videos have transcripts', [{ path: 'text', message: 'Not a recording' }]);
-    const before = m.toObject().transcript;
-    const translation = body.translation === undefined ? (m.transcript?.translation ?? null) : body.translation?.text ? body.translation : null;
-    m.set('transcript', {
-      status: body.text ? 'done' : 'none',
-      text: body.text,
-      language: body.language ?? m.transcript?.language ?? '',
-      source: body.text ? 'typed' : null,
-      translation,
-      error: null,
-      updatedAt: new Date(),
-    });
-    m.searchText = mediaSearchText(m);
-    await m.save();
-    await this.audit.record({ familyId: access.familyId, actorId: actor.userId, actorRole: access.role, action: 'media.transcript', targetType: 'media', targetId: m._id, before, after: m.toObject().transcript, requestId: actor.requestId, ip: actor.ip });
-    return this.view(access, m._id);
-  }
-
-  /** Asks the speech-to-text service for a transcript (and optionally an English translation). */
-  async transcribe(access: FamilyAccess, actor: Actor, id: Types.ObjectId, body: z.output<typeof transcribeBody>): Promise<MediaView> {
-    const m = await this.load(access, id);
-    if (!this.canEdit(access, m)) throw AppError.forbidden();
-    const t = this.transcription;
-    if (!t?.transcriber.enabled) throw new AppError('CONFLICT', 'Automatic transcription is not set up on this server. You can type the transcript instead.');
-    if (m.kind !== 'audio' && m.kind !== 'video') throw new AppError('VALIDATION_FAILED', 'Only recordings and videos can be transcribed', [{ path: 'id', message: 'Not a recording' }]);
-    if (m.transcript?.status === 'pending') throw new AppError('CONFLICT', 'This recording is already being transcribed');
-    if (m.byteSize > t.transcriber.maxBytes) throw new AppError('PAYLOAD_TOO_LARGE', `Recordings up to ${Math.round(t.transcriber.maxBytes / 1024 / 1024)} MB can be transcribed automatically. Type the transcript instead, or upload a shorter recording.`);
-    if (m.transcript?.source === 'typed' && m.transcript.text) throw new AppError('CONFLICT', 'This recording already has a typed transcript. Clear it first to transcribe automatically.');
-    await FamilyMediaModel.updateOne({ _id: m._id }, { $set: { 'transcript.status': 'pending', 'transcript.error': null, 'transcript.updatedAt': new Date() } });
-    await this.audit.record({ familyId: access.familyId, actorId: actor.userId, actorRole: access.role, action: 'media.transcribe_request', targetType: 'media', targetId: m._id, after: { translate: body.translate }, requestId: actor.requestId, ip: actor.ip });
-    await t.request({ mediaId: m.id as string, translate: body.translate });
     return this.view(access, m._id);
   }
 

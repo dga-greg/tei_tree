@@ -1,12 +1,12 @@
 # Deployment
 
-> **Heroku:** see [HEROKU.md](HEROKU.md): one app serves both the site and the API (`WEB_DIST_DIR`), plus a worker dyno.
+> **Heroku:** see [HEROKU.md](HEROKU.md): one app serves both the site and the API (`WEB_DIST_DIR`), on a single dyno.
 
 The application ships as two container images, built and published by CI:
 
 | Image | Contents | Runs as |
 |---|---|---|
-| `ghcr.io/<owner>/<repo>-api` | API (`node backend/dist/server.js`) and, with another command, the background worker (`node backend/dist/worker.js`) | non-root `node`, port 3000 |
+| `ghcr.io/<owner>/<repo>-api` | API (`node backend/dist/server.js`) | non-root `node`, port 3000 |
 | `ghcr.io/<owner>/<repo>-web` | the built web app on nginx, which also proxies `/api` to the API | non-root, port 8080 |
 
 Images are tagged with the branch name, the short commit and, for `v*` tags, the version. They are pushed for
@@ -18,9 +18,8 @@ stack (built from those images) have passed.
 | Service | Notes |
 |---|---|
 | MongoDB 7 **replica set** | Transactions require a replica set (a single node is fine). |
-| Redis 7 | Rate limits shared between API instances, e-mail queue, generation queue and the scheduled purge. Required in production. |
 | S3-compatible object storage | AWS S3, Cloudflare R2, SeaweedFS, MinIO… The bucket must stay **private**; the API hands out presigned links. |
-| SMTP | Account e-mails, invitations, review decisions. |
+| SMTP | Account e-mails (address confirmation, password reset, sign-in codes). Sent straight from the API. |
 | TLS terminator | Load balancer or reverse proxy in front of `web`; it should send `Strict-Transport-Security`. |
 
 ## Try the whole stack locally
@@ -42,7 +41,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec -e SUPER
 Sign in as that administrator and turn on two-step sign-in in **Settings → Security** (an authenticator app on your
 phone) — the administration pages stay closed until you do.
 
-## Configuration (API and worker)
+## Configuration (API)
 
 The API refuses to start in production without the essentials (`backend/src/config/env.ts` validates
 everything at start-up).
@@ -52,7 +51,6 @@ everything at start-up).
 | `NODE_ENV` | | `production` |
 | `APP_ORIGIN` | ✅ | Public address of the web app, `https://…` in production (used in e-mail links). |
 | `MONGODB_URI` | ✅ | Replica-set connection string. |
-| `REDIS_URL` | ✅ | |
 | `JWT_ACCESS_SECRET`, `CSRF_SECRET` | ✅ | 32+ random characters each. |
 | `COOKIE_SECURE` | | Defaults to `true` in production; must not be `false` there. |
 | `ALLOW_INSECURE_HTTP` | | Only for trying the stack on `http://localhost`: permits a plain-HTTP `APP_ORIGIN` and non-secure cookies (logged as a warning). Never on a public server. |
@@ -71,8 +69,7 @@ everything at start-up).
 | `MFA_ISSUER` | | Name shown in authenticator apps (default `Family Heritage`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Continue with Google". In Google Cloud Console → APIs & Services → Credentials, create an **OAuth client ID** of type *Web application*, with the authorised redirect URI `<APP_ORIGIN>/api/v1/auth/google/callback` (e.g. `https://family.example.org/api/v1/auth/google/callback`; for local development `http://localhost:4200/api/v1/auth/google/callback`). The consent screen needs only the `openid`, `email` and `profile` scopes. Without these settings the button is not shown. |
 | `MAP_TILE_URL`, `MAP_TILE_ATTRIBUTION`, `MAP_TILE_MAX_ZOOM` | | Street maps on the Places page: a tile URL such as `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, its required credit, and the deepest zoom. Without it the page draws places to scale on a plain background. OpenStreetMap's own tiles are for light use only (see their tile usage policy); for a busy site use a tile provider's plan. Also set **`MAP_TILE_ORIGINS`** on the web container (e.g. `https://tile.openstreetmap.org`) so the Content-Security-Policy allows the tiles. |
-| `TRANSCRIPTION_URL`, `TRANSCRIPTION_API_KEY`, `TRANSCRIPTION_MODEL`, `TRANSCRIPTION_MAX_MB` | | Automatic transcripts: an OpenAI-compatible `…/audio/transcriptions` endpoint (OpenAI, or a self-hosted Whisper server speaking the same API), its key, the model (default `whisper-1`) and the largest recording sent (default 25 MB). Translations into English use `…/audio/translations`. Runs on the worker's `transcriptions` queue (inline without Redis). Recordings are sent to that service, so tell the family which one you use. Without it, transcripts can still be typed. |
-| `GENERATION_INLINE_LIMIT` | | Families larger than this are recalculated by the worker (default 2 000). |
+| `GENERATION_INLINE_LIMIT` | | Families larger than this are recalculated in the background, in the API process, just after the request (default 2 000). |
 | `RATE_LIMIT_*`, `LOGIN_*`, `ARGON2_*` | | See `backend/.env.example`. |
 
 ## Configuration (web)
@@ -85,20 +82,10 @@ everything at start-up).
 
 ## Operations
 
-- **Health**: `GET /health/live` (process up), `GET /health/ready` (MongoDB and Redis connected); the web
+- **Health**: `GET /health/live` (process up), `GET /health/ready` (MongoDB connected); the web
   container answers `GET /healthz`.
-- **Scaling**: the API is stateless; run several behind the web/load balancer. Run at least one worker.
-- **Family books** are made by the worker on the `books` queue, one at a time (inline in the API without Redis). A
-  book reads every photo it includes from storage, so a large family's book takes a minute or two and some
-  memory (roughly 200–400 MB while it runs). The fonts it uses (Noto Serif and Noto Sans, subset to Latin and the
-  letters of Twi, Ga, Ewe and Hausa; SIL Open Font License) ship in the API image under `backend/assets/fonts`.
-- **Languages**: the interface's translations are static files (`/i18n/<code>.json`) served with the web app; see
-  [I18N.md](I18N.md) to add or review a language.
-- **Scheduled purge**: the worker erases families past their deletion grace period and removed files past
-  retention every 6 hours. Without a worker, run `node backend/dist/scripts/purge.js` from cron.
-- **Reminders**: every hour the worker sends the weekly e-mail and the morning notifications that are due in
-  each person's time zone (each at most once: delivery records). Without a worker, run
-  `node backend/dist/scripts/reminders.js` hourly from cron.
+- **One API process**: there is no Redis and no worker. E-mails and generation recalculations run inside the API
+  process, and rate limits are counted in its memory, so run a single API instance (ample for a family register).
 - **Installable app**: the web image includes a service worker that caches the app itself (never family data),
   so it opens offline and can be installed on phones and computers. Browsers require HTTPS for this (localhost
   excepted). The service worker, `ngsw.json`, the manifest and icons are served with `Cache-Control: no-cache`
@@ -107,4 +94,4 @@ everything at start-up).
 - **Backups**: back up MongoDB (e.g. `mongodump` or managed snapshots) and the bucket (versioning or
   replication). Families can also download their own GEDCOM/JSON copies.
 - **Logs**: JSON on stdout (pino). Cookies, CSRF tokens, passwords and signed file links are redacted.
-- **Releases**: tag `vX.Y.Z` on `main`; CI publishes `X.Y.Z` images. Roll out the API and worker together.
+- **Releases**: tag `vX.Y.Z` on `main`; CI publishes `X.Y.Z` images. 

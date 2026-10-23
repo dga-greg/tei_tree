@@ -1,7 +1,6 @@
-# API and background worker image. Build from the repository root:
+# API image. Build from the repository root:
 #   docker build -f backend/Dockerfile -t family-heritage-api .
 # Run the API:    docker run … family-heritage-api
-# Run the worker: docker run … family-heritage-api node backend/dist/worker.js
 
 # Behind a TLS-intercepting proxy, pass its CA certificate (kept out of the image):
 #   docker build --secret id=ca,src=/path/to/ca.pem …

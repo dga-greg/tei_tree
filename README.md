@@ -20,20 +20,19 @@ The app has four menus — **Dashboard**, **Family Tree**, **Family Members** an
 
 ## Stack
 
-Angular 21 (standalone, signals, zoneless) · Tailwind CSS 4 · Angular CDK · Lucide — Node.js 22 · Express 5 · TypeScript · MongoDB 7 (Mongoose) · Redis · BullMQ · Argon2id · Zod. Shared types and the permission matrix live in the `@fh/contracts` workspace package.
+Angular 21 (standalone, signals, zoneless) · Tailwind CSS 4 · Angular CDK · Lucide — Node.js 22 · Express 5 · TypeScript · MongoDB 7 (Mongoose) · Argon2id · Zod. Shared types and the permission matrix live in the `@fh/contracts` workspace package.
 
 ## Getting started
 
-Requirements: Node.js ≥ 22.12, npm 11 (`npm i -g npm@11`; npm 10 crashes on this workspace layout), Docker (for MongoDB, Redis and MailPit) or your own instances.
+Requirements: Node.js ≥ 22.12, npm 11 (`npm i -g npm@11`; npm 10 crashes on this workspace layout), Docker (for MongoDB and MailPit) or your own instances.
 
 ```bash
 npm install
-docker compose up -d                       # MongoDB replica set, Redis, MailPit (http://localhost:8025)
+docker compose up -d                       # MongoDB replica set, MailPit (http://localhost:8025)
 cp backend/.env.example backend/.env       # then replace both secrets
 npm run build:contracts
 
 npm run dev:api        # API on http://localhost:3000
-npm run dev:worker     # background jobs (e-mail)
 npm run dev:web        # web app on http://localhost:4200 (proxies /api to the API)
 ```
 
@@ -61,9 +60,9 @@ The end-to-end suite needs Chromium for Playwright (`npx playwright install chro
 
 ## Deployment
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). In short: CI publishes an API/worker image and a web image (nginx serving the app and proxying `/api`); `deploy/docker-compose.yml` runs the whole stack with MongoDB, Redis, MinIO and Mailpit.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). In short: CI publishes an API image and a web image (nginx serving the app and proxying `/api`); `deploy/docker-compose.yml` runs the whole stack with MongoDB, S3-compatible storage and Mailpit.
 
 - Serve the SPA and the API from the **same origin** (e.g. `https://heritage.example.org` and `https://heritage.example.org/api`) behind a reverse proxy that terminates TLS. The auth cookies are `SameSite=Strict` and Angular only sends the CSRF header to same-origin URLs. Set `TRUST_PROXY` to the number of proxy hops.
-- Production requires `REDIS_URL`, `SMTP_URL`, an `https://` `APP_ORIGIN` and secure cookies; the API refuses to start otherwise.
-- Run at least one worker (`npm run start:worker` in `backend/`) alongside the API.
+- Production requires `SMTP_URL`, an `https://` `APP_ORIGIN` and secure cookies; the API refuses to start otherwise.
+- There is no Redis and no worker: run one API process. E-mails and generation numbers are handled inside it.
 - MongoDB must be a replica set (Atlas clusters are).

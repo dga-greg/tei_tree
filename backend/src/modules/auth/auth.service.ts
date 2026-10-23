@@ -4,7 +4,7 @@ import { AppError } from '../../core/errors.js';
 import { randomToken, sha256 } from '../../core/crypto.js';
 import { addDays, addMinutes } from '../../core/dates.js';
 import type { Logger } from '../../core/logger.js';
-import type { EmailDispatcher } from '../../infra/queues.js';
+import type { EmailDispatcher } from '../../infra/email-dispatcher.js';
 import { UserModel, type UserDoc } from '../users/user.model.js';
 import { AuthSessionModel, type AuthSessionDoc } from './session.model.js';
 import { PasswordResetTokenModel } from './password-reset.model.js';

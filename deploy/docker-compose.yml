@@ -6,7 +6,7 @@
 #   open http://localhost:8080            # e-mail: http://localhost:8025
 #
 # For real hosting, put TLS in front of `web` (set APP_ORIGIN to the https address and COOKIE_SECURE=true),
-# use managed MongoDB/Redis/S3 where possible, and point SMTP_URL at a real mail service.
+# use managed MongoDB/S3 where possible, and point SMTP_URL at a real mail service.
 
 x-api-env: &api-env
   NODE_ENV: production
@@ -17,7 +17,6 @@ x-api-env: &api-env
   # Only for http://localhost; remove (and use https) anywhere else.
   ALLOW_INSECURE_HTTP: ${ALLOW_INSECURE_HTTP:-false}
   MONGODB_URI: mongodb://mongo:27017/family_heritage?replicaSet=rs0
-  REDIS_URL: redis://redis:6379
   JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in deploy/.env}
   CSRF_SECRET: ${CSRF_SECRET:?set CSRF_SECRET in deploy/.env}
   SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
@@ -56,16 +55,6 @@ services:
       interval: 5s
       timeout: 10s
       retries: 30
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: ['redis-server', '--appendonly', 'yes']
-    volumes: ['redis-data:/data']
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      retries: 20
     restart: unless-stopped
 
   # S3-compatible object storage (SeaweedFS). Any S3 service works in its place: set the S3_* variables.
@@ -111,17 +100,7 @@ services:
     environment: *api-env
     depends_on:
       mongo: { condition: service_healthy }
-      redis: { condition: service_healthy }
       s3-setup: { condition: service_completed_successfully }
-    restart: unless-stopped
-
-  worker:
-    image: ${IMAGE_PREFIX:-family-heritage}-api:${IMAGE_TAG:-local}
-    command: ['node', 'backend/dist/worker.js']
-    environment: *api-env
-    depends_on:
-      api: { condition: service_started }
-    healthcheck: { disable: true }
     restart: unless-stopped
 
   web:
@@ -138,5 +117,4 @@ services:
 
 volumes:
   mongo-data:
-  redis-data:
   s3-data:

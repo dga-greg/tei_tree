@@ -1,5 +1,5 @@
 /**
- * Smoke test of a running stack, through the web container (nginx → API → MongoDB/Redis/S3):
+ * Smoke test of a running stack, through the web container (nginx → API → MongoDB/S3):
  *   node deploy/smoke-test.mjs http://localhost:8080
  * Signs up, registers a family, uploads a photo and fetches it through its signed link.
  */

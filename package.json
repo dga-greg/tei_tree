@@ -21,8 +21,6 @@
     "dev:api": "npm run dev -w backend",
     "predev:web": "npm run build:contracts",
     "dev:web": "npm start -w frontend",
-    "predev:worker": "npm run build:contracts",
-    "dev:worker": "npm run dev:worker -w backend",
     "e2e": "npm run build:contracts && npm test -w e2e",
     "heroku-postbuild": "npm run build"
   }

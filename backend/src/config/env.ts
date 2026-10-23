@@ -18,9 +18,6 @@ const EnvSchema = z
     APP_ORIGIN: z.url(),
 
     MONGODB_URI: z.string().min(1),
-    REDIS_URL: z.string().optional().transform((v) => (v ? v : undefined)),
-    /** `false` for managed Redis with a self-signed certificate (Heroku Key-Value Store); still encrypted. */
-    REDIS_TLS_VERIFY: bool.default(true),
 
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     CSRF_SECRET: z.string().min(32, 'CSRF_SECRET must be at least 32 characters'),
@@ -44,7 +41,7 @@ const EnvSchema = z
     RATE_LIMIT_GLOBAL_PER_MINUTE: z.coerce.number().int().min(1).default(300),
     RATE_LIMIT_AUTH_PER_15_MINUTES: z.coerce.number().int().min(1).default(10),
 
-    /** Families with more people than this are recalculated by the background worker. */
+    /** Families with more people than this are recalculated in the background, after the response. */
     GENERATION_INLINE_LIMIT: z.coerce.number().int().min(0).default(2000),
 
     /** Where uploaded files live: `local` (a directory, development) or `s3` (any S3-compatible store). */
@@ -76,13 +73,7 @@ const EnvSchema = z
     SMTP_URL: z.string().optional().transform((v) => (v ? v : undefined)),
     MAIL_FROM: z.string().default('Family Heritage <no-reply@localhost>'),
 
-    /** Automatic transcripts: an OpenAI-compatible speech-to-text endpoint (OpenAI Whisper, or a self-hosted Whisper server). */
-    TRANSCRIPTION_URL: z.url().optional().or(z.literal('').transform(() => undefined)),
-    TRANSCRIPTION_API_KEY: z.string().optional().transform((v) => (v ? v : undefined)),
-    TRANSCRIPTION_MODEL: z.string().default('whisper-1'),
-    /** Largest recording sent for transcription (OpenAI accepts 25 MB). */
-    TRANSCRIPTION_MAX_MB: z.coerce.number().int().min(1).max(1000).default(25),
-    /** Base map for the places map, e.g. https://tile.openstreetmap.org/{z}/{x}/{y}.png (add its origin to the web image's MAP_TILE_ORIGINS). */
+    /** Base map tiles; only add their origin to the page's security policy (no map in this build). */
     MAP_TILE_URL: z.string().optional().transform((v) => (v ? v : undefined)),
     MAP_TILE_ATTRIBUTION: z.string().default('© OpenStreetMap contributors'),
     MAP_TILE_MAX_ZOOM: z.coerce.number().int().min(1).max(22).default(18),
@@ -103,7 +94,6 @@ const EnvSchema = z
     if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) ctx.addIssue({ code: 'custom', path: ['S3_BUCKET'], message: 'required with STORAGE_DRIVER=s3' });
     if (!!env.GOOGLE_CLIENT_ID !== !!env.GOOGLE_CLIENT_SECRET) ctx.addIssue({ code: 'custom', path: ['GOOGLE_CLIENT_SECRET'], message: 'set both Google client settings, or neither' });
     if (env.NODE_ENV !== 'production') return;
-    if (!env.REDIS_URL) ctx.addIssue({ code: 'custom', path: ['REDIS_URL'], message: 'required in production' });
     if (!env.SMTP_URL) ctx.addIssue({ code: 'custom', path: ['SMTP_URL'], message: 'required in production' });
     if (env.STORAGE_DRIVER !== 's3') ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'must be s3 in production' });
     if (env.ALLOW_INSECURE_HTTP) return;

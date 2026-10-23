@@ -25,21 +25,3 @@ describe('credential endpoint rate limiting', () => {
     expect(blocked.body.error.code).toBe('RATE_LIMITED');
   });
 });
-
-describe('when Redis is down', () => {
-  it('still answers requests instead of waiting for it', async () => {
-    const { createRedis } = await import('../src/infra/redis.js');
-    const { createLogger } = await import('../src/core/logger.js');
-    // Nothing listens on this port.
-    const redis = createRedis('redis://127.0.0.1:6399', createLogger('silent', false));
-    const down = buildApp({}, { redis });
-    try {
-      const started = Date.now();
-      const res = await new TestClient(down).get('/auth/csrf');
-      expect(res.status).toBe(200);
-      expect(Date.now() - started).toBeLessThan(8000);
-    } finally {
-      redis.disconnect();
-    }
-  }, 20_000);
-});

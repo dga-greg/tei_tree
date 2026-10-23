@@ -16,9 +16,9 @@ describe('environment validation', () => {
     expect(() => loadEnv({ ...base, JWT_ACCESS_SECRET: 'short' })).toThrow(/JWT_ACCESS_SECRET/);
   });
 
-  it('requires Redis, SMTP, object storage and secure cookies in production', () => {
-    expect(() => loadEnv({ ...base, NODE_ENV: 'production' })).toThrow(/REDIS_URL[\s\S]*SMTP_URL[\s\S]*STORAGE_DRIVER/);
-    const prod = { ...base, NODE_ENV: 'production', REDIS_URL: 'redis://r', SMTP_URL: 'smtp://s', STORAGE_DRIVER: 's3', S3_BUCKET: 'family-media' };
+  it('requires SMTP, object storage and secure cookies in production', () => {
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production' })).toThrow(/SMTP_URL[\s\S]*STORAGE_DRIVER/);
+    const prod = { ...base, NODE_ENV: 'production', SMTP_URL: 'smtp://s', STORAGE_DRIVER: 's3', S3_BUCKET: 'family-media' };
     expect(() => loadEnv({ ...prod, COOKIE_SECURE: 'false' })).toThrow(/COOKIE_SECURE/);
     expect(() => loadEnv({ ...prod, S3_BUCKET: '' })).toThrow(/S3_BUCKET/);
     // Plain HTTP only with the explicit local-trial switch.

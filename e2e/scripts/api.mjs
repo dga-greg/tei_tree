@@ -29,7 +29,6 @@ const env = {
   PORT: process.env.E2E_API_PORT ?? '3100',
   APP_ORIGIN: process.env.E2E_WEB_ORIGIN ?? 'http://localhost:4300',
   MONGODB_URI: db.toString(),
-  REDIS_URL: '',
   SMTP_URL: '',
   JWT_ACCESS_SECRET: 'e2e-access-secret-that-is-at-least-32-chars',
   CSRF_SECRET: 'e2e-csrf-secret-that-is-at-least-32-characters',

@@ -6,8 +6,7 @@ import mongoose from 'mongoose';
 import { pinoHttp } from 'pino-http';
 import type { Env } from './config/env.js';
 import { redactUrl, type Logger } from './core/logger.js';
-import type { Redis } from './infra/redis.js';
-import { EmailDispatcher } from './infra/queues.js';
+import { EmailDispatcher } from './infra/email-dispatcher.js';
 import type { Mailer } from './infra/mailer.js';
 import { requestId } from './middleware/request-id.js';
 import { CsrfProtection } from './middleware/csrf.js';
@@ -56,7 +55,6 @@ export interface AppDependencies {
   env: Env;
   logger: Logger;
   mailer: Mailer;
-  redis?: Redis;
   /** Defaults to the provider configured by STORAGE_DRIVER. */
   storage?: StorageProvider;
   google?: GoogleIdentity;
@@ -68,7 +66,7 @@ export interface AppInstance {
 }
 
 /** Builds the Express application. Does not listen or connect to databases (see server.ts). */
-export function createApp({ env, logger, mailer, redis, storage = storageFromEnv(env), google = googleFromEnv(env) }: AppDependencies): AppInstance {
+export function createApp({ env, logger, mailer, storage = storageFromEnv(env), google = googleFromEnv(env) }: AppDependencies): AppInstance {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', env.TRUST_PROXY);
@@ -82,7 +80,7 @@ export function createApp({ env, logger, mailer, redis, storage = storageFromEnv
   const accessTokens = new AccessTokenService(env.JWT_ACCESS_SECRET, env.ACCESS_TOKEN_TTL_SECONDS);
   const cookies = new AuthCookies(env.COOKIE_SECURE);
   const csrf = new CsrfProtection(env.CSRF_SECRET, { secure: env.COOKIE_SECURE, sameSite: 'strict', path: '/' });
-  const emailDispatcher = new EmailDispatcher(mailer, logger, redis);
+  const emailDispatcher = new EmailDispatcher(mailer, logger);
   const audit = new AuditService();
   const mfaKey = env.MFA_ENCRYPTION_KEY ?? createHmac('sha256', env.JWT_ACCESS_SECRET).update('mfa-secrets').digest('hex');
   const mfa = new MfaService({ issuer: env.MFA_ISSUER, adminRequired: env.ADMIN_MFA_REQUIRED }, new SecretBox(mfaKey), hasher, emailDispatcher);
@@ -141,12 +139,11 @@ export function createApp({ env, logger, mailer, redis, storage = storageFromEnv
   });
   app.get('/health/ready', (_req, res) => {
     const mongoReady = mongoose.connection.readyState === 1;
-    const redisReady = redis ? redis.status === 'ready' : true;
-    res.status(mongoReady && redisReady ? 200 : 503).json({ mongo: mongoReady, redis: redis ? redisReady : 'disabled' });
+    res.status(mongoReady ? 200 : 503).json({ mongo: mongoReady });
   });
 
   const api = express.Router();
-  api.use(globalRateLimit(env.RATE_LIMIT_GLOBAL_PER_MINUTE, redis));
+  api.use(globalRateLimit(env.RATE_LIMIT_GLOBAL_PER_MINUTE));
   // Long stories and biographies (up to 100 000 characters of UTF-8) must fit; anything larger is refused.
   api.use(express.json({ limit: '1mb' }));
   api.use(cookieParser());
@@ -158,9 +155,9 @@ export function createApp({ env, logger, mailer, redis, storage = storageFromEnv
   api.use(csrf.verify);
   api.use(authenticate(accessTokens));
 
-  const credentialLimiter = authRateLimit(env.RATE_LIMIT_AUTH_PER_15_MINUTES, redis);
+  const credentialLimiter = authRateLimit(env.RATE_LIMIT_AUTH_PER_15_MINUTES);
   api.use('/auth', authRoutes(new AuthController(authService, cookies, csrf, mfa, googleSignIn, env.APP_ORIGIN), credentialLimiter));
-  const generationScheduler = new GenerationScheduler(new GenerationsService(logger), logger, redis, env.GENERATION_INLINE_LIMIT);
+  const generationScheduler = new GenerationScheduler(new GenerationsService(logger), logger, env.GENERATION_INLINE_LIMIT);
   const familiesService = new FamiliesService(audit, generationScheduler);
   const branchesService = new BranchesService(audit, generationScheduler);
   const relationshipsService = new RelationshipsService(audit, generationScheduler, branchesService);
@@ -176,7 +173,7 @@ export function createApp({ env, logger, mailer, redis, storage = storageFromEnv
       new RelationshipsController(relationshipsService),
       new GenerationsController(new GenerationsReadService(), generationScheduler, membersService),
       new TreeController(new TreeService(branchesService)),
-      { media: new MediaController(mediaService), uploadLimiter: uploadRateLimit(Math.max(100, env.RATE_LIMIT_AUTH_PER_15_MINUTES), redis) },
+      { media: new MediaController(mediaService), uploadLimiter: uploadRateLimit(Math.max(100, env.RATE_LIMIT_AUTH_PER_15_MINUTES)) },
     ),
   );
   // What the app may offer. Public, holds no secrets.
@@ -193,7 +190,7 @@ export function createApp({ env, logger, mailer, redis, storage = storageFromEnv
   api.use(notFoundHandler);
 
   // Signed links to locally stored files (development; production serves S3 links directly).
-  if (storage instanceof LocalStorage) app.use('/api/v1/files', fileRateLimit(Math.max(1200, env.RATE_LIMIT_GLOBAL_PER_MINUTE * 4), redis), localFilesRoutes(storage));
+  if (storage instanceof LocalStorage) app.use('/api/v1/files', fileRateLimit(Math.max(1200, env.RATE_LIMIT_GLOBAL_PER_MINUTE * 4)), localFilesRoutes(storage));
   app.use('/api/v1', api);
   // The web app itself, when this process also serves it (WEB_DIST_DIR).
   if (env.WEB_DIST_DIR) app.use(webRoutes(env.WEB_DIST_DIR, env));

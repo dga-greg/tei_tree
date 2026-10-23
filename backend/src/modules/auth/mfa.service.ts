@@ -4,7 +4,7 @@ import { RECOVERY_CODE_COUNT, type MfaStatus, type TotpSetupResponse } from '@fh
 import { AppError } from '../../core/errors.js';
 import { randomToken, sha256 } from '../../core/crypto.js';
 import { addMinutes } from '../../core/dates.js';
-import type { EmailDispatcher } from '../../infra/queues.js';
+import type { EmailDispatcher } from '../../infra/email-dispatcher.js';
 import { UserModel, type UserDoc } from '../users/user.model.js';
 import { mfaDisabledEmail, mfaEnabledEmail, recoveryCodeUsedEmail } from './auth.emails.js';
 import { MfaChallengeModel } from './mfa-challenge.model.js';

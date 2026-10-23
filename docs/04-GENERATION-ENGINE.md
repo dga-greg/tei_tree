@@ -44,11 +44,11 @@ Cousin marriage across generations: Kofi (G1) → Kwame (G2) → Yaw (G3); Kofi 
 
 ### Changing the founder
 
-`family.set_founder` (admin only) sets `foundingMemberId` to any person — typically a newly discovered ancestor above the current founder — inside a transaction that writes an audit entry, then enqueues `generation.recalculate` with job id `gen:<familyId>` (BullMQ de-duplicates bursts of edits into one run). Overrides are cleared when the founder changes because their meaning is relative to the old founder.
+`family.set_founder` (admin only) sets `foundingMemberId` to any person — typically a newly discovered ancestor above the current founder — inside a transaction that writes an audit entry, then asks for a recalculation (bursts of edits to a large family are folded into one background run). Overrides are cleared when the founder changes because their meaning is relative to the old founder.
 
 ### When recalculation runs
 
-After any committed change to: a descent edge (create / delete / subtype / verification), the founder, the adoptive policy, or an override. Families under 2 000 people are recalculated in the same request after commit; larger ones via the worker. The UI shows "Recalculating…" from the `pending` status on the family stats.
+After any committed change to: a descent edge (create / delete / subtype / verification), the founder, the adoptive policy, or an override. Families under 2 000 people are recalculated in the same request after commit; larger ones in the background of the same process, just after the response. The UI shows "Recalculating…" from the `pending` status on the family stats.
 
 ## 4.3 Relationship engine
 
