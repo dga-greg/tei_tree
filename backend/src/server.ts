@@ -4,6 +4,7 @@ import { createLogger } from './core/logger.js';
 import { connectMongo, disconnectMongo, syncIndexes } from './infra/mongo.js';
 import { LogMailer, SmtpMailer } from './infra/mailer.js';
 import { createApp } from './app.js';
+import { backfillFamilyCodes } from './modules/members/family-code.js';
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -22,6 +23,10 @@ async function main(): Promise<void> {
   await syncIndexes(logger);
 
   const server = app.listen(env.PORT, () => logger.info({ port: env.PORT, storage: env.STORAGE_DRIVER === 's3' ? `s3 (${env.S3_BUCKET} at ${env.S3_ENDPOINT ?? 'AWS'})` : `local (${path.resolve(env.MEDIA_LOCAL_DIR)})` }, 'API listening'));
+  // Families recorded before family IDs existed get theirs now, in the background.
+  void backfillFamilyCodes((familyId, err) => logger.error({ err, familyId }, 'Giving family IDs failed'))
+    .then((n) => n && logger.info({ families: n }, 'Family IDs given to existing families'))
+    .catch((err: unknown) => logger.error({ err }, 'Giving family IDs to existing families failed'));
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'Shutting down');
     server.close(async () => {

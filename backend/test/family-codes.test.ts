@@ -151,3 +151,18 @@ describe('member details', () => {
     expect((await person(id)).photoUrl).toMatch(/\/media\/[a-f0-9]+\/content\?variant=thumb/);
   });
 });
+
+describe('families recorded before family IDs', () => {
+  it('get IDs from the start-up backfill', async () => {
+    const { backfillFamilyCodes } = await import('../src/modules/members/family-code.js');
+    const { FamilyMemberModel } = await import('../src/modules/members/member.model.js');
+    const admin = await registeredClient(ctx, 'old@example.org');
+    const fam = (await admin.post('/families', { name: 'Old Family', founder: { firstName: 'Kofi', surname: 'Old' } })).body.data;
+    const child = await addPerson(admin, fam.id, { firstName: 'Ama', surname: 'Old' }, { parents: [{ memberId: fam.foundingMemberId, subtype: 'biological', verification: 'verified' }] });
+    // As if recorded by the earlier version of the app.
+    await FamilyMemberModel.updateMany({ familyId: fam.id }, { $set: { familyCode: null } });
+    expect(await backfillFamilyCodes(() => undefined)).toBeGreaterThanOrEqual(1);
+    expect((await admin.get(`/families/${fam.id}/members/${child}`)).body.data.familyCode).toBe('G1.1');
+    expect(await backfillFamilyCodes(() => undefined)).toBe(0);
+  });
+});

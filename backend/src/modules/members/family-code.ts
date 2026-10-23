@@ -120,3 +120,22 @@ export async function assignFamilyCodes(familyId: Types.ObjectId): Promise<numbe
   }
   return given.size;
 }
+
+/**
+ * Gives IDs to people in families that existed before family IDs (or were changed while giving IDs failed).
+ * Run once at start-up. Returns how many families had people given an ID.
+ */
+export async function backfillFamilyCodes(log: (familyId: string, err: unknown) => void): Promise<number> {
+  const familyIds = await FamilyMemberModel.distinct('familyId', { familyCode: null, deletedAt: null });
+  let done = 0;
+  for (const familyId of familyIds as Types.ObjectId[]) {
+    const family = await FamilyModel.exists({ _id: familyId, foundingMemberId: { $ne: null } });
+    if (!family) continue;
+    try {
+      if ((await assignFamilyCodes(familyId)) > 0) done++;
+    } catch (err) {
+      log(familyId.toString(), err);
+    }
+  }
+  return done;
+}
