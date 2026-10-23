@@ -1,0 +1,114 @@
+@import 'tailwindcss';
+@import '@angular/cdk/overlay-prebuilt.css';
+
+/* Theme is chosen by the user (system/light/dark) and applied as data-theme on <html>. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme {
+  --font-sans: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+
+  /* Brand: deep forest green with a kente-inspired gold accent. */
+  --color-brand-50: #f0f7f2;
+  --color-brand-100: #dcede1;
+  --color-brand-200: #bbdcc6;
+  --color-brand-300: #8ec3a2;
+  --color-brand-400: #5ea47b;
+  --color-brand-500: #3d875d;
+  --color-brand-600: #2b6c48;
+  --color-brand-700: #22563a;
+  --color-brand-800: #1d4530;
+  --color-brand-900: #14532d;
+  --color-brand-950: #0b2516;
+
+  --color-gold-100: #fbf1d3;
+  --color-gold-300: #f0cf6b;
+  --color-gold-500: #d4a017;
+  --color-gold-700: #8f6a0c;
+
+  /*
+   * Generation accents (G1…G8, then repeating). Each pairs with a visible "G<n>" label so colour is
+   * never the only cue; the -ink variants meet WCAG AA contrast on the -tint backgrounds.
+   */
+  --color-gen-1-tint: #fdf3dc;  --color-gen-1-ink: #7a5300;
+  --color-gen-2-tint: #e7f3ea;  --color-gen-2-ink: #1f5b36;
+  --color-gen-3-tint: #e4f0fa;  --color-gen-3-ink: #1c4f7a;
+  --color-gen-4-tint: #f1e9f9;  --color-gen-4-ink: #5b2f86;
+  --color-gen-5-tint: #fbe8ec;  --color-gen-5-ink: #8a2440;
+  --color-gen-6-tint: #e3f4f3;  --color-gen-6-ink: #13615c;
+  --color-gen-7-tint: #fcece0;  --color-gen-7-ink: #8a3e0c;
+  --color-gen-8-tint: #eceef3;  --color-gen-8-ink: #3a4357;
+
+  --radius-card: 1rem;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-raised: 0 12px 32px -12px rgb(16 24 40 / 0.18);
+}
+
+@layer base {
+  html {
+    @apply bg-stone-50 text-stone-900 antialiased;
+    color-scheme: light;
+  }
+  html[data-theme='dark'] {
+    @apply bg-stone-950 text-stone-100;
+    color-scheme: dark;
+    /* Generation accents re-stepped for the dark surface (deep tint, light ink). */
+    --color-gen-1-tint: #3a2a05;  --color-gen-1-ink: #f3d27a;
+    --color-gen-2-tint: #12301f;  --color-gen-2-ink: #9fd9b4;
+    --color-gen-3-tint: #10283d;  --color-gen-3-ink: #9cc8ef;
+    --color-gen-4-tint: #2a1a3d;  --color-gen-4-ink: #cdb4f0;
+    --color-gen-5-tint: #3a1622;  --color-gen-5-ink: #f2a8bd;
+    --color-gen-6-tint: #0f302d;  --color-gen-6-ink: #8fd9d1;
+    --color-gen-7-tint: #3a2010;  --color-gen-7-ink: #f4b88d;
+    --color-gen-8-tint: #23272f;  --color-gen-8-ink: #c3c9d6;
+  }
+  body {
+    @apply min-h-dvh font-sans;
+  }
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Reusable component classes (usable in templates and with @apply). */
+@utility card {
+  @apply rounded-(--radius-card) border border-stone-200 bg-white shadow-(--shadow-card) dark:border-stone-800 dark:bg-stone-900;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition
+    disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility btn-primary {
+  @apply btn bg-brand-700 text-white shadow-sm hover:bg-brand-800 active:bg-brand-900;
+}
+@utility btn-secondary {
+  @apply btn border border-stone-300 bg-white text-stone-800 hover:bg-stone-50
+    dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800;
+}
+@utility btn-ghost {
+  @apply btn text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800;
+}
+@utility btn-danger {
+  @apply btn bg-red-700 text-white hover:bg-red-800;
+}
+@utility input {
+  @apply block w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-900 shadow-sm
+    placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none
+    aria-[invalid=true]:border-red-500 aria-[invalid=true]:focus:ring-red-100
+    dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:ring-brand-900;
+}
+@utility label {
+  @apply mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-300;
+}
+@utility badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold;
+}

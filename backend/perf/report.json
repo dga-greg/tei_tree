@@ -1,0 +1,118 @@
+{
+  "people": 20000,
+  "relationships": 34998,
+  "runs": 15,
+  "seedMs": 3008.939791,
+  "results": [
+    {
+      "name": "generation recalculation (whole family)",
+      "p95": 5312.071043,
+      "budget": 15000,
+      "runs": 1,
+      "ok": true
+    },
+    {
+      "name": "relationship finder (cold, loads the graph)",
+      "p95": 540.8606689999997,
+      "budget": 3000,
+      "runs": 1,
+      "ok": true
+    },
+    {
+      "name": "relationship finder (warm)",
+      "p50": 22.72519899999861,
+      "p95": 36.28259099999923,
+      "budget": 150,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "tree root (depth 3)",
+      "p50": 96.477746999999,
+      "p95": 114.23271399999976,
+      "budget": 300,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "tree descendants (depth 4)",
+      "p50": 114.0465409999997,
+      "p95": 153.64791800000057,
+      "budget": 400,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "members list (page 1)",
+      "p50": 26.703428000000713,
+      "p95": 37.94232699999884,
+      "budget": 250,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "members search",
+      "p50": 47.41373599999861,
+      "p95": 60.12894700000106,
+      "budget": 200,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "person profile",
+      "p50": 25.98034899999766,
+      "p95": 30.50286699999924,
+      "budget": 200,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "dashboard",
+      "p50": 104.78852700000061,
+      "p95": 335.44406900000104,
+      "budget": 800,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "generations summary",
+      "p50": 19.059101999999257,
+      "p95": 26.978816999999253,
+      "budget": 500,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "timeline (one person)",
+      "p50": 62.75525800000105,
+      "p95": 74.82475599999816,
+      "budget": 300,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "stories list",
+      "p50": 21.17887900000278,
+      "p95": 30.777631000000838,
+      "budget": 200,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "media list",
+      "p50": 13.254128000000492,
+      "p95": 19.795035999999527,
+      "budget": 200,
+      "runs": 15,
+      "ok": true
+    },
+    {
+      "name": "GEDCOM export (whole family)",
+      "p95": 1494.267136999999,
+      "budget": 15000,
+      "runs": 1,
+      "ok": true
+    }
+  ],
+  "at": "2026-10-16T12:00:20.094Z"
+}

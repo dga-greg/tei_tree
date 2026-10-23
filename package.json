@@ -1,0 +1,29 @@
+{
+  "name": "family-heritage",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Family Tree & Generational History platform",
+  "workspaces": [
+    "contracts",
+    "backend",
+    "frontend",
+    "e2e"
+  ],
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build:contracts": "npm run build -w @fh/contracts",
+    "build": "npm run build:contracts && npm run build -w backend && npm run build -w frontend",
+    "test": "npm run build:contracts && npm test -w @fh/contracts && npm test -w backend && npm test -w frontend",
+    "typecheck": "npm run build:contracts && npm run typecheck -w backend",
+    "predev:api": "npm run build:contracts",
+    "dev:api": "npm run dev -w backend",
+    "predev:web": "npm run build:contracts",
+    "dev:web": "npm start -w frontend",
+    "predev:worker": "npm run build:contracts",
+    "dev:worker": "npm run dev:worker -w backend",
+    "e2e": "npm run build:contracts && npm test -w e2e",
+    "heroku-postbuild": "npm run build"
+  }
+}

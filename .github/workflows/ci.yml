@@ -1,0 +1,176 @@
+name: Family Heritage
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+    inputs:
+      perf:
+        description: Run the performance check
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Type checks, unit and integration tests, builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # npm 10's arborist crashes on this workspace layout; npm 11 installs it cleanly.
+      - run: npm install -g npm@11
+      - run: npm ci
+      - name: Dependency audit (production dependencies)
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run build:contracts
+      - run: npm test -w @fh/contracts
+      - run: npm run typecheck -w backend
+      - run: npm run typecheck -w e2e
+      - name: Backend tests (MongoDB replica set via mongodb-memory-server)
+        run: npm test -w backend
+      - run: npm test -w frontend
+      - name: Translations (every text marked, every catalog complete)
+        run: |
+          npm run i18n:lint -w frontend
+          npm run i18n:extract -w frontend
+          git diff --exit-code frontend/src/i18n/keys.json || (echo "Run npm run i18n:extract -w frontend and commit keys.json" && exit 1)
+          npm run i18n:check -w frontend
+      - run: npm run build -w backend
+      - run: npm run build -w frontend
+
+  e2e:
+    name: End-to-end (Playwright)
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: Run the journeys against the real API and web app
+        run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+            e2e/.output/api.log
+          retention-days: 7
+
+  perf:
+    name: Performance check (20 000 people)
+    if: github.event_name == 'workflow_dispatch' && inputs.perf
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run build:contracts
+      - run: npm run perf -w backend
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-report
+          path: backend/perf/report.json
+
+  images:
+    name: Docker images and stack smoke test
+    needs: [checks, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PUBLISH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Image names
+        id: names
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "api=${repo}-api" >> "$GITHUB_OUTPUT"
+          echo "web=${repo}-web" >> "$GITHUB_OUTPUT"
+      - uses: docker/metadata-action@v5
+        id: api-meta
+        with:
+          images: ${{ steps.names.outputs.api }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+      - uses: docker/metadata-action@v5
+        id: web-meta
+        with:
+          images: ${{ steps.names.outputs.web }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: true
+          tags: family-heritage-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          load: true
+          tags: family-heritage-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+      - name: Start the whole stack from the built images
+        run: |
+          cp deploy/.env.example deploy/.env
+          sed -i "s/^JWT_ACCESS_SECRET=.*/JWT_ACCESS_SECRET=$(openssl rand -hex 32)/; s/^CSRF_SECRET=.*/CSRF_SECRET=$(openssl rand -hex 32)/; s/^MFA_ENCRYPTION_KEY=.*/MFA_ENCRYPTION_KEY=$(openssl rand -hex 32)/; s/^S3_SECRET_ACCESS_KEY=.*/S3_SECRET_ACCESS_KEY=$(openssl rand -hex 16)/" deploy/.env
+          IMAGE_PREFIX=family-heritage IMAGE_TAG=ci docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --no-build --wait --wait-timeout 180
+      - name: Smoke test through nginx (sign up, create a family, upload and fetch a photo)
+        run: node deploy/smoke-test.mjs http://localhost:8080
+      - if: failure()
+        run: docker compose -f deploy/docker-compose.yml --env-file deploy/.env logs --no-color --tail 200
+      - if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish images
+        if: env.PUBLISH == 'true'
+        run: |
+          for tag in ${{ join(fromJSON(steps.api-meta.outputs.json).tags, ' ') }}; do docker tag family-heritage-api:ci "$tag" && docker push "$tag"; done
+          for tag in ${{ join(fromJSON(steps.web-meta.outputs.json).tags, ' ') }}; do docker tag family-heritage-web:ci "$tag" && docker push "$tag"; done

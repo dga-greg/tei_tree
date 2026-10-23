@@ -1,0 +1,51 @@
+{
+  "name": "frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build && node scripts/modulepreload.mjs",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test --watch=false",
+    "i18n:extract": "node scripts/i18n.mjs extract",
+    "i18n:check": "node scripts/i18n.mjs check",
+    "i18n:lint": "node scripts/i18n.mjs lint"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/cdk": "^21.2.0",
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "@angular/service-worker": "^21.2.25",
+    "@fh/contracts": "*",
+    "@lucide/angular": "^1.58.0",
+    "chart.js": "^4.5.0",
+    "d3-selection": "^3.0.0",
+    "d3-transition": "^3.0.1",
+    "d3-zoom": "^3.0.0",
+    "jspdf": "^4.2.1",
+    "leaflet": "^1.9.4",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.2.27",
+    "@angular/cli": "^21.2.27",
+    "@angular/compiler-cli": "^21.2.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/d3-selection": "^3.0.12",
+    "@types/d3-transition": "^3.0.9",
+    "@types/d3-zoom": "^3.0.9",
+    "@types/leaflet": "^1.9.20",
+    "jsdom": "^28.0.0",
+    "postcss": "^8.5.0",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}

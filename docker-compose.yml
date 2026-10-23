@@ -1,0 +1,26 @@
+# Local development services. Start with: docker compose up -d
+services:
+  mongo:
+    image: mongo:7
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    ports: ['27017:27017']
+    volumes: ['mongo-data:/data/db']
+    healthcheck:
+      # Initiates the single-node replica set on first start (transactions require a replica set).
+      test: >
+        mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+
+  mailpit:
+    # Catches outgoing e-mail; open http://localhost:8025 to read password-reset messages.
+    image: axllent/mailpit:latest
+    ports: ['1025:1025', '8025:8025']
+
+volumes:
+  mongo-data:

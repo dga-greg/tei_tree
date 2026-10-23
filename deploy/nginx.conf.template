@@ -1,0 +1,77 @@
+# Rendered by the nginx image at start-up (envsubst): ${API_UPSTREAM}, ${MEDIA_ORIGINS}, ${MAP_TILE_ORIGINS}, ${MAX_UPLOAD_SIZE}.
+# TLS is expected to end at a load balancer or reverse proxy in front of this container, which should
+# also send Strict-Transport-Security.
+
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    # Security headers for the single-page app. Styles allow 'unsafe-inline' because Angular binds
+    # style attributes; scripts are only the app's own files.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: ${MEDIA_ORIGINS} ${MAP_TILE_ORIGINS}; media-src 'self' blob: ${MEDIA_ORIGINS}; connect-src 'self' ${MEDIA_ORIGINS} ${MAP_TILE_ORIGINS} https://fonts.gstatic.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header X-Frame-Options "DENY" always;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok";
+    }
+
+    # The API (same origin, so cookies stay SameSite=Strict and no CORS is needed).
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-Id $request_id;
+        # Uploads stream through to the API, which enforces its own (smaller) limit while receiving.
+        client_max_body_size ${MAX_UPLOAD_SIZE};
+        proxy_request_buffering off;
+        proxy_read_timeout 120s;
+        # The API's own headers (CSP for JSON, no-store) apply; do not add the page headers above.
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    location = /health/live { proxy_pass ${API_UPSTREAM}; }
+
+    # The service worker, its manifest and the app icons keep their names between releases: always revalidate,
+    # so a new release reaches installed apps.
+    location ~ ^/(?:ngsw-worker\.js|safety-worker\.js|worker-basic\.min\.js|ngsw\.json|manifest\.webmanifest|icons/.+)$ {
+        try_files $uri =404;
+        types {
+            application/javascript js;
+            application/json json;
+            application/manifest+json webmanifest;
+            image/png png;
+        }
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    # Fingerprinted build output can be cached for a year.
+    location ~* \.(?:js|css|woff2?|ttf|svg|png|jpg|ico|webp)$ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    # Everything else is the app; index.html must never be cached so new releases load at once.
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: ${MEDIA_ORIGINS} ${MAP_TILE_ORIGINS}; media-src 'self' blob: ${MEDIA_ORIGINS}; connect-src 'self' ${MEDIA_ORIGINS} ${MAP_TILE_ORIGINS} https://fonts.gstatic.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header X-Frame-Options "DENY" always;
+    }
+}

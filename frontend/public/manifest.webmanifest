@@ -1,0 +1,22 @@
+{
+  "name": "Family Heritage",
+  "short_name": "Family",
+  "description": "Your family's tree, history, photographs and calendar.",
+  "id": "/",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fafaf9",
+  "theme_color": "#14532d",
+  "categories": ["lifestyle", "social"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Family tree", "url": "/tree", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Calendar", "url": "/calendar", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

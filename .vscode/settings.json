@@ -1,0 +1,6 @@
+{
+  // The code is formatted by hand (single quotes, long lines); saving must not reformat whole files.
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false,
+  "prettier.enable": false
+}
