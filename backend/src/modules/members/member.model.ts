@@ -37,6 +37,18 @@ const FamilyMemberSchema = new Schema(
     deathPlace: { type: String, default: '', maxlength: 200 },
     nationality: { type: String, default: '', maxlength: 100 },
     hometown: { type: String, default: '', maxlength: 120 },
+    /** Where the person lives now ("place of stay"). */
+    residence: { type: String, default: '', trim: true, maxlength: 200 },
+    /** Extra details the family records, e.g. Occupation: Teacher. */
+    attributes: {
+      type: [new Schema({ name: { type: String, required: true, trim: true, maxlength: 60 }, value: { type: String, default: '', trim: true, maxlength: 500 } }, { _id: false })],
+      default: [],
+    },
+    /**
+     * Family ID (G1, G1.2, G1.2-W1…): given once when the person is connected to the family and never changed or
+     * reused, so it can be written down and shared. See members/family-code.ts.
+     */
+    familyCode: { type: String, default: null },
     /** Lines recorded on this person (see contracts/src/lineage.ts); empty means inherited from the parents. */
     maternalLine: { type: String, default: '', trim: true, maxlength: 80 },
     paternalLine: { type: String, default: '', trim: true, maxlength: 80 },
@@ -115,6 +127,8 @@ FamilyMemberSchema.index({ familyId: 1, deletedAt: 1, surname: 1, firstName: 1, 
 FamilyMemberSchema.index({ familyId: 1, deletedAt: 1, 'birthDate.sortKey': 1, surname: 1, firstName: 1, _id: 1 });
 FamilyMemberSchema.index({ familyId: 1, 'birthDate.year': 1 });
 FamilyMemberSchema.index({ familyId: 1, hometown: 1 });
+// A family ID belongs to one person, including removed ones (IDs are never reused).
+FamilyMemberSchema.index({ familyId: 1, familyCode: 1 }, { unique: true, partialFilterExpression: { familyCode: { $type: 'string' } } });
 FamilyMemberSchema.index({ familyId: 1, 'generation.status': 1 });
 FamilyMemberSchema.index({ familyId: 1, importBatchId: 1 }, { partialFilterExpression: { importBatchId: { $type: 'objectId' } } });
 

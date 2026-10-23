@@ -19,6 +19,10 @@ export class MembersController {
     res.json({ data: result.data });
   };
 
+  attributeNames = async (req: Request, res: Response) => {
+    res.json({ data: await this.members.attributeNames(accessOf(req)) });
+  };
+
   create = async (req: Request, res: Response) => {
     const access = accessOf(req);
     const { person, links } = parse(createMemberBody, req.body);

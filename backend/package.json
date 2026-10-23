@@ -13,10 +13,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "create-super-admin": "tsx --env-file-if-exists=.env src/scripts/create-super-admin.ts",
-    "purge": "tsx --env-file-if-exists=.env src/scripts/purge.ts",
-    "reminders": "tsx --env-file-if-exists=.env src/scripts/reminders.ts",
-    "vapid": "tsx src/scripts/vapid.ts",
-    "purge:prod": "node dist/scripts/purge.js",
     "perf": "tsx perf/perf.ts"
   },
   "dependencies": {

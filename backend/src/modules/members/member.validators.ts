@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import {
+  ATTRIBUTE_NAME_MAX_LENGTH,
+  ATTRIBUTE_VALUE_MAX_LENGTH,
   GENDERS,
   GENERATION_STATUSES,
+  MAX_ATTRIBUTES,
   MEMBER_PRIVACY_LEVELS,
   MEMBER_SORTS,
   PARENT_CHILD_SUBTYPES,
@@ -49,6 +52,11 @@ const memberFields = {
   deathPlace: text(200),
   nationality: text(100),
   hometown: text(120),
+  residence: text(200),
+  attributes: z
+    .array(z.object({ name: text(ATTRIBUTE_NAME_MAX_LENGTH).min(1, 'Name the detail'), value: text(ATTRIBUTE_VALUE_MAX_LENGTH) }).strict())
+    .max(MAX_ATTRIBUTES)
+    .refine((list) => new Set(list.map((a) => a.name.toLowerCase())).size === list.length, 'Each detail can appear only once'),
   maternalLine: text(80),
   paternalLine: text(80),
   totem: text(80),

@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   }
   if (!redis) logger.warn('REDIS_URL not set: using in-memory rate limits and inline e-mail delivery (development only)');
 
-  const { app, close, lifecycle, notifications, announcements } = createApp({
+  const { app, close } = createApp({
     env,
     logger,
     redis,
@@ -26,16 +26,6 @@ async function main(): Promise<void> {
   await syncIndexes(logger);
 
   const server = app.listen(env.PORT, () => logger.info({ port: env.PORT, storage: env.STORAGE_DRIVER === 's3' ? `s3 (${env.S3_BUCKET} at ${env.S3_ENDPOINT ?? 'AWS'})` : `local (${path.resolve(env.MEDIA_LOCAL_DIR)})` }, 'API listening'));
-  // With Redis the worker runs the purge on a schedule; without it (development) the API does.
-  const purgeTimer = redis ? null : setInterval(() => void lifecycle.purge().catch((err: unknown) => logger.error({ err }, 'Purge failed')), 6 * 60 * 60 * 1000);
-  purgeTimer?.unref();
-  // Likewise for reminders: every hour, each person gets what is due in their own time zone.
-  const remindersTimer = redis ? null : setInterval(() => void notifications.run().catch((err: unknown) => logger.error({ err }, 'Reminders failed')), 60 * 60 * 1000);
-  remindersTimer?.unref();
-  // And for announcements held for the night, and the day-before reminders.
-  const announcementsTimer = redis ? null : setInterval(() => void announcements.runDue().catch((err: unknown) => logger.error({ err }, 'Announcements failed')), 5 * 60 * 1000);
-  announcementsTimer?.unref();
-
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'Shutting down');
     server.close(async () => {

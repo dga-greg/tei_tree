@@ -41,9 +41,27 @@ export interface GenerationInfo {
   overridden: boolean;
 }
 
+/** An extra detail the family records on a person, e.g. "Occupation: Teacher". */
+export interface MemberAttribute {
+  name: string;
+  value: string;
+}
+
+export const ATTRIBUTE_NAME_MAX_LENGTH = 60;
+export const ATTRIBUTE_VALUE_MAX_LENGTH = 500;
+export const MAX_ATTRIBUTES = 50;
+
 /** Compact person representation used by lists, relatives, tree nodes and search results. */
 export interface PersonCard {
   id: string;
+  /**
+   * The person's family ID: G1 for the family head, G1.2 for the head's second child, G1.2.1 for that child's first
+   * child; a husband or wife who married in takes their partner's ID with -W1, -H1 (or -S1). Never changes once given;
+   * null until the person is connected to the family.
+   */
+  familyCode: string | null;
+  /** The name people call them by. */
+  preferredName: string;
   displayName: string;
   firstName: string;
   surname: string;
@@ -54,6 +72,8 @@ export interface PersonCard {
   vitalStatus: VitalStatus | null;
   gender: Gender | null;
   hometown: string | null;
+  /** Where the person lives now. */
+  residence: string | null;
   generation: GenerationInfo;
   isFounder: boolean;
 }
@@ -97,6 +117,10 @@ export interface MemberInput {
   deathPlace?: string;
   nationality?: string;
   hometown?: string;
+  /** Where the person lives now ("place of stay"). */
+  residence?: string;
+  /** Extra details, in the order shown. */
+  attributes?: MemberAttribute[];
   /** Line through the mother (e.g. abusua), when recorded on this person; otherwise inherited. */
   maternalLine?: string;
   /** Line through the father (e.g. ntoro or clan). */
@@ -164,8 +188,8 @@ export interface MemberView extends PersonCard {
   middleNames: string;
   maidenName: string;
   previousNames: string[];
-  preferredName: string;
   title: string;
+  attributes: MemberAttribute[];
   birthPlace: string | null;
   deathPlace: string | null;
   nationality: string | null;

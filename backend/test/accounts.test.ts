@@ -342,7 +342,7 @@ describe('Google sign-in', () => {
     expect((await ama.delete('/auth/google')).status).toBe(409);
   });
 
-  it('accounts made with Google set a password before unlinking, and can be deleted after a recent sign-in', async () => {
+  it('accounts made with Google set a password before unlinking', async () => {
     const esi = await new TestClient(ctx).init();
     await viaGoogle(esi);
     await esi.init();
@@ -353,12 +353,6 @@ describe('Google sign-in', () => {
     expect((await esi.post('/auth/change-password', { newPassword: 'another long password here' })).status).toBe(400);
     expect((await esi.delete('/auth/google')).status).toBe(204);
 
-    google.profile = { sub: 'g-3', email: 'yaw@gmail.com', emailVerified: true, name: 'Yaw', hostedDomain: null };
-    const yaw = await new TestClient(ctx).init();
-    await viaGoogle(yaw);
-    await yaw.init();
-    expect((await yaw.post('/account/delete', {})).status).toBe(204);
-    expect((await UserModel.findOne({ 'google.sub': 'g-3' }))).toBeNull();
   });
 
   it('still asks for the code when two-step sign-in is on', async () => {

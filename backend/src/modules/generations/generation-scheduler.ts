@@ -4,6 +4,7 @@ import type { Logger } from '../../core/logger.js';
 import type { Redis } from '../../infra/redis.js';
 import { QUEUE_NAMES } from '../../infra/queues.js';
 import { FamilyModel } from '../families/family.model.js';
+import { assignFamilyCodes } from '../members/family-code.js';
 import type { GenerationsService } from './generations.service.js';
 
 export interface GenerationJob {
@@ -29,6 +30,12 @@ export class GenerationScheduler {
   }
 
   async request(familyId: Types.ObjectId): Promise<void> {
+    // Family IDs are given at once, in the request, so the answer already shows them.
+    try {
+      await assignFamilyCodes(familyId);
+    } catch (err) {
+      this.logger.error({ err, familyId: familyId.toString() }, 'Giving family IDs failed');
+    }
     const family = await FamilyModel.findById(familyId, { 'stats.memberCount': 1 });
     if (!family) return;
     const size = family.stats?.memberCount ?? 0;

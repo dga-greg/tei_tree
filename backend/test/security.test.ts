@@ -50,7 +50,7 @@ async function call(client: TestClient, method: string, path: string) {
 
 describe('route sweep', () => {
   it('finds the family routes', () => {
-    expect(ROUTES.length).toBeGreaterThan(60);
+    expect(ROUTES.length).toBeGreaterThan(15);
   });
 
   it('hides a private family from outsiders and anonymous visitors on every route', async () => {

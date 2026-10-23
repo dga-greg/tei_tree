@@ -38,6 +38,18 @@ type Links = {
   partners?: { memberId: string; subtype: string; status?: string; verification: 'verified' | 'unverified' | 'disputed' }[];
 };
 
+/** Orders family IDs as people read them: G1.2 before G1.10, a person before their spouses and children. */
+export function compareFamilyCodes(a: string, b: string): number {
+  const parts = (c: string) => c.slice(1).split(/(?=[.-][A-Z]?\d)/).map((p) => (p.startsWith('.') ? [0, Number(p.slice(1))] : p.startsWith('-') && /[A-Z]/.test(p[1]!) ? [-1, Number(p.slice(2))] : [0, Number(p)]));
+  const pa = parts(a);
+  const pb = parts(b);
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    const d = pa[i]![0]! - pb[i]![0]! || pa[i]![1]! - pb[i]![1]!;
+    if (d) return d;
+  }
+  return pa.length - pb.length;
+}
+
 /** Name-derived search fields, recomputed whenever a name changes. */
 export function searchFields(m: {
   firstName: string;
@@ -265,6 +277,14 @@ export class MembersService {
     }
 
     let tokens: string[] = [];
+    // A family ID (G1.2, g1.2-w1): that person and everyone below them, in ID order.
+    const code = query.q?.trim().toUpperCase();
+    if (code && /^G-?\d+(\.\d+)*(-[WHS]\d*)?$/.test(code)) {
+      match['familyCode'] = new RegExp(`^${escapeRegex(code)}($|[.-])`);
+      const docs = (await FamilyMemberModel.find(match)).filter((d) => policy.isVisible(d)).sort((a, b) => compareFamilyCodes(a.familyCode!, b.familyCode!));
+      const rows = docs.slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
+      return { data: rows.map((d) => toPersonCard(d, policy)), meta: pageMeta(query, docs.length) };
+    }
     if (query.q) {
       tokens = normalizeName(query.q).split(/\s+/).filter((t) => t.length >= 2);
       if (tokens.length === 0) return { data: [] as PersonCard[], meta: pageMeta(query, 0) };
@@ -305,6 +325,19 @@ export class MembersService {
     // Restricted profiles still appear in member lists (names only), but guests never see hidden people.
     const data = docs.filter((d) => policy.isVisible(d)).map((d) => toPersonCard(d, policy));
     return { data, meta: pageMeta(query, result?.total[0]?.n ?? 0) };
+  }
+
+  /** The extra details already used in this family, most used first, to suggest consistent names. */
+  async attributeNames(access: FamilyAccess): Promise<string[]> {
+    access.assert('member.view');
+    const rows = await FamilyMemberModel.aggregate<{ _id: string; n: number }>([
+      { $match: { familyId: access.familyId, deletedAt: null } },
+      { $unwind: '$attributes' },
+      { $group: { _id: '$attributes.name', n: { $sum: 1 } } },
+      { $sort: { n: -1, _id: 1 } },
+      { $limit: 200 },
+    ]);
+    return rows.map((r) => r._id);
   }
 
   // ------------------------------------------------------------------ update & delete

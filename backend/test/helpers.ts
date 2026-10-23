@@ -10,7 +10,6 @@ import { loadEnv, type Env } from '../src/config/env.js';
 import { createLogger } from '../src/core/logger.js';
 import { MemoryMailer } from '../src/infra/mailer.js';
 import { syncIndexes } from '../src/infra/mongo.js';
-import { MemoryPushSender } from '../src/infra/push.js';
 
 export const TEST_PASSWORD = 'correct horse battery staple';
 
@@ -53,16 +52,14 @@ export async function clearDb(): Promise<void> {
 export interface TestContext {
   instance: AppInstance;
   mailer: MemoryMailer;
-  push: MemoryPushSender;
   env: Env;
 }
 
 export function buildApp(overrides: Record<string, string> = {}, deps: Partial<AppDependencies> = {}): TestContext {
   const env = testEnv(overrides);
   const mailer = new MemoryMailer();
-  const push = new MemoryPushSender();
-  const instance = createApp({ env, logger: createLogger('silent', false), mailer, push, ...deps });
-  return { instance, mailer, push, env };
+  const instance = createApp({ env, logger: createLogger('silent', false), mailer, ...deps });
+  return { instance, mailer, env };
 }
 
 function cookieValue(res: Response, name: string): string | undefined {

@@ -36,6 +36,8 @@ export function toPersonCard(m: FamilyMemberDoc, policy: MemberPolicy): PersonCa
   const birth = full ? toFuzzyDate(m.birthDate) : null;
   return {
     id: m.id as string,
+    familyCode: m.familyCode ?? null,
+    preferredName: m.preferredName,
     displayName: displayName(m),
     firstName: m.firstName,
     surname: m.surname,
@@ -46,6 +48,7 @@ export function toPersonCard(m: FamilyMemberDoc, policy: MemberPolicy): PersonCa
     vitalStatus: full ? m.vitalStatus : null,
     gender: full ? (m.gender ?? null) : null,
     hometown: full ? m.hometown || null : null,
+    residence: full ? m.residence || null : null,
     generation: generationOf(m),
     isFounder: policy.isFounder(m._id),
   };
@@ -85,8 +88,8 @@ export function toMemberView(m: FamilyMemberDoc, policy: MemberPolicy, relatives
     middleNames: m.middleNames,
     maidenName: m.maidenName,
     previousNames: [...m.previousNames],
-    preferredName: m.preferredName,
     title: m.title,
+    attributes: full ? (m.attributes ?? []).map((a) => ({ name: a.name, value: a.value })) : [],
     birthPlace: full && !minorHidden ? m.birthPlace || null : null,
     deathPlace: full ? m.deathPlace || null : null,
     nationality: full ? m.nationality || null : null,

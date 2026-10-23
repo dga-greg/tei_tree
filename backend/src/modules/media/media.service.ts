@@ -8,7 +8,6 @@ import { fuzzyDateSchema } from '../../core/fuzzy-date.js';
 import { objectId, pageMeta, parse } from '../../core/validation.js';
 import type { StorageProvider } from '../../infra/storage.js';
 import type { AuditService } from '../audit/audit.service.js';
-import { FamilyEventModel } from '../events/event.model.js';
 import type { FamilyAccess } from '../families/family-access.js';
 import { FamilyMemberModel } from '../members/member.model.js';
 import { toFuzzyDate } from '../members/member.mapper.js';
@@ -152,7 +151,8 @@ export class MediaService {
   /** Whether uploads by this viewer are published at once, go to review, or are refused. */
   private uploadMode(access: FamilyAccess): 'direct' | 'review' {
     if (access.can('media.upload')) return 'direct';
-    if (access.membership && access.canPropose('media.upload')) {
+    // Uploads that need review go to the suggestions queue, when this build has one.
+    if (this.review && access.membership && access.canPropose('media.upload')) {
       if (access.family.privacy?.allowMemberUploads === false) throw AppError.forbidden('This family does not accept uploads from members. Ask an administrator to add the file.');
       return 'review';
     }
@@ -233,12 +233,10 @@ export class MediaService {
     return { data: await this.toViews(access, rows), meta: pageMeta(query, total) };
   }
 
-  private async assertEvent(access: FamilyAccess, eventId: string | null | undefined): Promise<Types.ObjectId | null> {
+  /** This build has no family events to attach files to. */
+  private async assertEvent(_access: FamilyAccess, eventId: string | null | undefined): Promise<Types.ObjectId | null> {
     if (!eventId) return null;
-    if (!(await FamilyEventModel.exists({ _id: eventId, familyId: access.familyId, deletedAt: null }))) {
-      throw new AppError('VALIDATION_FAILED', 'That event is not in the family timeline', [{ path: 'eventId', message: 'Unknown event' }]);
-    }
-    return new Types.ObjectId(eventId);
+    throw new AppError('VALIDATION_FAILED', 'Files cannot be attached to events', [{ path: 'eventId', message: 'Unknown event' }]);
   }
 
   async upload(access: FamilyAccess, actor: Actor, req: Request): Promise<MediaView> {
