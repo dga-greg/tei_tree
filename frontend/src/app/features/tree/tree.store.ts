@@ -20,9 +20,6 @@ export class TreeStore {
   readonly collapsed = signal(new Set<string>());
   readonly selectedId = signal<string | null>(null);
   readonly highlight = signal<{ mode: HighlightMode; of: string } | null>(null);
-  /** People on a relationship path, highlighted together (from the relationship finder). */
-  readonly pathHighlight = signal<Set<string> | null>(null);
-  readonly generationFocus = signal<number | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly truncated = signal(false);
@@ -39,8 +36,6 @@ export class TreeStore {
 
   /** People and links lit up by "highlight ancestors / descendants". Null when nothing is highlighted. */
   readonly highlighted = computed<Set<string> | null>(() => {
-    const path = this.pathHighlight();
-    if (path) return path;
     const h = this.highlight();
     if (!h) return null;
     const edges = [...this._edges().values()].filter((e) => e.type === 'parent_child');
@@ -92,11 +87,6 @@ export class TreeStore {
   loadRoot(familyId: string, depth: number): Promise<void> {
     this.familyId = familyId;
     return this.run(async () => this.replace(await this.api.root(familyId, depth)));
-  }
-
-  loadBranch(familyId: string, branchId: string, depth: number): Promise<void> {
-    this.familyId = familyId;
-    return this.run(async () => this.replace(await this.api.branch(familyId, branchId, depth)));
   }
 
   /** Shows a person's children, fetching them if they were not loaded yet. */
@@ -159,7 +149,6 @@ export class TreeStore {
   }
 
   setHighlight(mode: HighlightMode | null): void {
-    this.pathHighlight.set(null);
     const id = this.selectedId();
     this.highlight.set(mode && id ? { mode, of: id } : null);
   }

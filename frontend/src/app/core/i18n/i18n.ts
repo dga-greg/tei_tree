@@ -97,13 +97,7 @@ export function format(text: string, params: Params): string {
 
 // ------------------------------------------------------------------ choosing and loading the language
 
-const LOCALE_DATA: Record<string, () => Promise<{ default: unknown[] }>> = {
-  fr: () => import('@angular/common/locales/fr'),
-  ak: () => import('@angular/common/locales/ak'),
-  ee: () => import('@angular/common/locales/ee'),
-  ha: () => import('@angular/common/locales/ha'),
-  gaa: () => import('@angular/common/locales/gaa'),
-};
+const LOCALE_DATA: Record<string, () => Promise<{ default: unknown[] }>> = {};
 
 function stored(): string | null {
   try {
@@ -119,7 +113,7 @@ export function preferredLanguage(): string {
   if (chosen) return chosen.code;
   for (const tag of typeof navigator !== 'undefined' ? navigator.languages ?? [] : []) {
     const base = tag.toLowerCase().split('-')[0];
-    const match = LANGUAGES.find((l) => l.code === base || (base === 'ak' && l.code === 'tw'));
+    const match = LANGUAGES.find((l) => l.code === base);
     if (match) return match.code;
   }
   return DEFAULT_LANGUAGE;

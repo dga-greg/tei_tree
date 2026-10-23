@@ -76,30 +76,6 @@ const EnvSchema = z
     SMTP_URL: z.string().optional().transform((v) => (v ? v : undefined)),
     MAIL_FROM: z.string().default('Family Heritage <no-reply@localhost>'),
 
-    /** Web push (VAPID) keys: `npm run vapid -w backend` makes a pair. Without them, phone notifications are off. */
-    WEB_PUSH_PUBLIC_KEY: z.string().optional().transform((v) => (v ? v : undefined)),
-    WEB_PUSH_PRIVATE_KEY: z.string().optional().transform((v) => (v ? v : undefined)),
-    /** Contact for push services, a mailto: or https: URL. Defaults to the MAIL_FROM address. */
-    WEB_PUSH_SUBJECT: z.string().optional().transform((v) => (v ? v : undefined)),
-    /** SMS through GiantSMS (giantsms.com): the API token (GIANT_AUTH), the account for the balance, the approved sender ID. */
-    SMS_PROVIDER: z.enum(['none', 'log', 'giantsms']).optional(),
-    GIANT_AUTH: z.string().optional().transform((v) => (v ? v : undefined)),
-    GIANT_USERNAME: z.string().optional().transform((v) => (v ? v : undefined)),
-    GIANT_PASSWORD: z.string().optional().transform((v) => (v ? v : undefined)),
-    GIANT_SENDER_ID: z.string().optional().transform((v) => (v ? v : undefined)),
-    /** Estimated price of one SMS part in pesewas, shown before sending. */
-    SMS_PRICE_PESEWAS: z.coerce.number().min(0).max(1000).default(3),
-    /** SMS parts one family may send in a calendar month. */
-    SMS_MONTHLY_LIMIT_PER_FAMILY: z.coerce.number().int().min(0).max(1_000_000).default(2000),
-    /** WhatsApp Business (Meta Cloud API): a permanent token, the sending number's ID and an approved message template. */
-    WHATSAPP_TOKEN: z.string().optional().transform((v) => (v ? v : undefined)),
-    WHATSAPP_PHONE_NUMBER_ID: z.string().optional().transform((v) => (v ? v : undefined)),
-    WHATSAPP_TEMPLATE: z.string().default('family_announcement'),
-    WHATSAPP_TEMPLATE_LANGUAGE: z.string().default('en'),
-    /** Messages are not sent at night (Ghana time): they wait until the morning. */
-    MESSAGING_TIMEZONE: z.string().default('Africa/Accra'),
-    /** false: send at any hour (tests). */
-    MESSAGING_QUIET_HOURS: bool.default(true),
     /** Automatic transcripts: an OpenAI-compatible speech-to-text endpoint (OpenAI Whisper, or a self-hosted Whisper server). */
     TRANSCRIPTION_URL: z.url().optional().or(z.literal('').transform(() => undefined)),
     TRANSCRIPTION_API_KEY: z.string().optional().transform((v) => (v ? v : undefined)),
@@ -122,15 +98,10 @@ const EnvSchema = z
     /** "Continue with Google": an OAuth client (Web application) whose redirect URI is <APP_ORIGIN>/api/v1/auth/google/callback. */
     GOOGLE_CLIENT_ID: z.string().optional().transform((v) => (v ? v : undefined)),
     GOOGLE_CLIENT_SECRET: z.string().optional().transform((v) => (v ? v : undefined)),
-    /** Local hour (0-23) at which reminders and the weekly e-mail go out, in each person's time zone. */
-    REMINDER_HOUR: z.coerce.number().int().min(0).max(23).default(7),
   })
   .superRefine((env, ctx) => {
     if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) ctx.addIssue({ code: 'custom', path: ['S3_BUCKET'], message: 'required with STORAGE_DRIVER=s3' });
     if (!!env.GOOGLE_CLIENT_ID !== !!env.GOOGLE_CLIENT_SECRET) ctx.addIssue({ code: 'custom', path: ['GOOGLE_CLIENT_SECRET'], message: 'set both Google client settings, or neither' });
-    if (env.SMS_PROVIDER === 'giantsms' && (!env.GIANT_AUTH || !env.GIANT_SENDER_ID)) ctx.addIssue({ code: 'custom', path: ['GIANT_AUTH'], message: 'GiantSMS needs GIANT_AUTH and GIANT_SENDER_ID' });
-    if (!!env.WHATSAPP_TOKEN !== !!env.WHATSAPP_PHONE_NUMBER_ID) ctx.addIssue({ code: 'custom', path: ['WHATSAPP_PHONE_NUMBER_ID'], message: 'set WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID together, or neither' });
-    if (!!env.WEB_PUSH_PUBLIC_KEY !== !!env.WEB_PUSH_PRIVATE_KEY) ctx.addIssue({ code: 'custom', path: ['WEB_PUSH_PRIVATE_KEY'], message: 'set both web push keys, or neither' });
     if (env.NODE_ENV !== 'production') return;
     if (!env.REDIS_URL) ctx.addIssue({ code: 'custom', path: ['REDIS_URL'], message: 'required in production' });
     if (!env.SMTP_URL) ctx.addIssue({ code: 'custom', path: ['SMTP_URL'], message: 'required in production' });

@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { LanguagePickerComponent } from '../shared/ui/language-picker.component';
 import { LogoComponent } from '../shared/ui/logo.component';
 
 @Component({
   selector: 'fh-auth-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, RouterOutlet, LogoComponent, LanguagePickerComponent],
+  imports: [TranslatePipe, RouterOutlet, LogoComponent],
   template: `
     <div class="grid min-h-dvh lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <section class="relative hidden overflow-hidden bg-brand-950 p-12 text-brand-50 lg:flex lg:flex-col xl:p-16" aria-hidden="true">
@@ -26,7 +25,7 @@ import { LogoComponent } from '../shared/ui/logo.component';
       </section>
       <main class="flex items-center justify-center px-4 py-10 sm:px-8">
         <div class="w-full max-w-md">
-          <div class="mb-8 flex items-center justify-between gap-4"><fh-logo class="lg:invisible" /><fh-language-picker [compact]="true" /></div>
+          <div class="mb-8 flex items-center justify-between gap-4"><fh-logo class="lg:invisible" /></div>
           <router-outlet />
         </div>
       </main>

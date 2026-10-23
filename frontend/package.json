@@ -23,7 +23,6 @@
     "@angular/service-worker": "^21.2.25",
     "@fh/contracts": "*",
     "@lucide/angular": "^1.58.0",
-    "chart.js": "^4.5.0",
     "d3-selection": "^3.0.0",
     "d3-transition": "^3.0.1",
     "d3-zoom": "^3.0.0",

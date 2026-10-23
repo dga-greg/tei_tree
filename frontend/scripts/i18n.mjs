@@ -9,7 +9,7 @@
  * Texts are found where they are marked: `'Text' | t` in templates, `t('Text')` and `mark('Text')` in code, the
  * `*_LABELS` maps of @fh/contracts, and the fixed messages the API sends (AppError and validation messages).
  */
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -92,7 +92,7 @@ const placeholders = (s) =>
 function check() {
   const keys = JSON.parse(readFileSync(keysFile, 'utf8'));
   let failed = false;
-  for (const name of readdirSync(catalogsDir).filter((n) => n.endsWith('.json'))) {
+  for (const name of existsSync(catalogsDir) ? readdirSync(catalogsDir).filter((n) => n.endsWith('.json')) : []) {
     const catalog = JSON.parse(readFileSync(join(catalogsDir, name), 'utf8'));
     const missing = keys.filter((k) => !(k in catalog) || typeof catalog[k] !== 'string' || !catalog[k].trim());
     const stale = Object.keys(catalog).filter((k) => !keys.includes(k));

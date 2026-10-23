@@ -1,7 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { api, seedFamily, signUp } from './support';
 
-test('register a family with its founder, add a child, and see generations and the tree', async ({ page }) => {
+const code = (page: Page) => page.locator('header [data-testid=family-code]');
+
+test('register a family with its head, add a child, and see family IDs on the profile and in the tree', async ({ page }) => {
   await signUp(page, 'Ama Mensah');
   await page.goto('/families/new');
   await page.getByLabel('Family name').fill('Asante Family');
@@ -9,11 +11,10 @@ test('register a family with its founder, add a child, and see generations and t
   await page.getByLabel('First name').fill('Nana');
   await page.getByLabel('Surname').fill('Asante');
   await page.getByRole('button', { name: 'Register family' }).click();
-  await page.waitForURL(/\/(dashboard|members\/)/);
-
-  await page.goto('/members');
-  await page.getByRole('link', { name: /Nana Asante/ }).first().click();
+  await page.waitForURL(/\/members\//);
   await expect(page.getByRole('heading', { level: 1, name: 'Nana Asante' })).toBeVisible();
+  await expect(code(page)).toHaveText('G1');
+
   await page.getByRole('link', { name: 'Add a new person as children' }).click();
   await expect(page.getByText('Will be added as a child of')).toBeVisible();
   await page.getByLabel('First name').fill('Kwabena');
@@ -21,31 +22,56 @@ test('register a family with its founder, add a child, and see generations and t
   await page.getByRole('button', { name: 'Add person' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Kwabena Asante' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Parents' }).getByText('Nana Asante')).toBeVisible();
-  await expect(page.getByText('G2').first()).toBeVisible();
+  await expect(code(page)).toHaveText('G1.1');
 
-  await page.goto('/generations');
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.goto('/tree');
-  await expect(page.locator('fh-tree-canvas g[role=button][aria-label^="Nana Asante"]')).toBeVisible();
-  await expect(page.locator('fh-tree-canvas g[role=button][aria-label^="Kwabena Asante"]')).toBeVisible();
+  await expect(page.locator('fh-tree-canvas g[role=button][aria-label^="Nana Asante"]')).toHaveAttribute('aria-label', /G1 · Family head/);
+  await expect(page.locator('fh-tree-canvas g[role=button][aria-label^="Kwabena Asante"]')).toHaveAttribute('aria-label', /G1\.1/);
 });
 
-test('the relationship finder names cousins and shows the path in the tree', async ({ page }) => {
+test('a person’s status, date of death and other details are recorded and shown', async ({ page }) => {
   await signUp(page, 'Ama Mensah');
   const fam = await seedFamily(page);
-  await page.goto(`/relationships?a=${fam.people['yaw']}&b=${fam.people['abena']}`);
-  await expect(page.locator('#answer-h')).toHaveText("Yaw Mensah is Abena Mensah's first cousin.");
-  await expect(page.getByRole('list', { name: 'Relationship path' }).getByRole('listitem')).toHaveCount(5);
-  await page.getByRole('link', { name: 'Show this path in the family tree' }).click();
-  await expect(page).toHaveURL(/\/tree\?path=/);
-  await expect(page.locator('fh-tree-canvas g[role=button][aria-label^="Abena Mensah"]')).toBeVisible();
+  await page.goto(`/members/${fam.people['yaw']}/edit`);
+  await page.getByLabel('Common name').fill('Papa Yaw');
+  await page.getByLabel('Place of stay').fill('Accra');
+
+  // The date of death is asked for only once "Deceased" is chosen.
+  await expect(page.getByLabel('Date of death: year')).toHaveCount(0);
+  await page.getByText('Deceased', { exact: true }).click();
+  await page.getByLabel('Date of death: year').fill('2019');
+
+  await page.getByRole('button', { name: 'Add a detail' }).click();
+  await page.getByLabel('Detail 1', { exact: true }).fill('Occupation');
+  await page.getByLabel('Value of detail 1').fill('Teacher');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Yaw Mensah' })).toBeVisible();
+  const details = page.getByRole('region', { name: 'Details', exact: true });
+  await expect(details).toContainText('Papa Yaw');
+  await expect(details).toContainText('Accra');
+  await expect(details).toContainText('2019');
+  await expect(page.getByTestId('attributes')).toContainText('Occupation');
+  await expect(page.getByTestId('attributes')).toContainText('Teacher');
+
+  // The detail's name is offered for the next person.
+  await page.goto(`/members/${fam.people['abena']}/edit`);
+  await page.getByRole('button', { name: 'Add a detail' }).click();
+  await expect(page.locator('#attribute-names option[value="Occupation"]')).toHaveCount(1);
 });
 
-test('people are found by name, and integrity rules are explained', async ({ page }) => {
+test('people are found by name or family ID, and integrity rules are explained', async ({ page }) => {
   await signUp(page, 'Ama Mensah');
   const fam = await seedFamily(page);
   await page.goto('/members');
-  await page.getByRole('searchbox').first().fill('abena');
+  const search = page.getByLabel('Search by name or family ID');
+  await search.fill('abena');
+  await expect(page.getByRole('link', { name: /Abena Mensah/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Kwame Mensah/ })).toHaveCount(0);
+
+  // An ID finds that person and everyone below them.
+  await search.fill('G1.2');
+  await expect(page.getByRole('link', { name: /Ama Mensah/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Abena Mensah/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Kwame Mensah/ })).toHaveCount(0);
 
@@ -57,29 +83,6 @@ test('people are found by name, and integrity rules are explained', async ({ pag
   await page.getByRole('option', { name: /Yaw Mensah/ }).click();
   await dialog.getByRole('button', { name: 'Save relationship' }).click();
   await expect(dialog.getByText(/ancestor|cycle|descendant/i)).toBeVisible();
-});
-
-test('people show the era they were born in, and the generations page counts each era', async ({ page }) => {
-  await signUp(page, 'Ama Mensah');
-  const fam = await seedFamily(page);
-
-  // Cousins of the same family generation, born in different eras.
-  await page.goto(`/members/${fam.people['abena']}`);
-  await expect(page.locator('header').getByText('Baby Boomer')).toBeVisible();
-  await expect(page.locator('header').getByText('G3')).toBeVisible();
-  await page.goto(`/members/${fam.people['yaw']}`);
-  await expect(page.locator('header').getByText('Silent Gen', { exact: true })).toHaveAttribute('title', 'Silent Generation: born 1928–1945');
-  await expect(page.locator('header').getByText('G3')).toBeVisible();
-
-  await page.goto('/generations');
-  const eras = page.getByRole('region', { name: 'By era of birth' });
-  await expect(eras).toBeVisible();
-  const rows = eras.getByRole('listitem');
-  await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText('Lost Generation');
-  await expect(rows.nth(1)).toContainText('Greatest Generation');
-  await expect(rows.nth(1)).toContainText('2');
-  await expect(eras.getByText('1 person has no known birth year and is not counted.')).toBeVisible();
 });
 
 test('with two families, the family shown at the top is the one whose figures are shown', async ({ page }) => {

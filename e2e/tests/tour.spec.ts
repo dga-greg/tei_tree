@@ -12,11 +12,11 @@ test('a new member is shown around once, and can take the tour again', async ({ 
   // Only the founder so far: the dashboard says how to start.
   await expect(page.getByTestId('start-tree')).toBeVisible();
 
-  const tour = page.getByRole('dialog', { name: 'Welcome to your family archive' });
+  const tour = page.getByRole('dialog', { name: 'Welcome to your family tree' });
   await expect(tour).toBeVisible();
   await expect(tour).toContainText('Step 1 of 6');
   await tour.getByRole('button', { name: 'Show me around' }).click();
-  for (const title of ['Your family', 'Add your relatives', 'See the family tree', 'Everything else is in the menu']) {
+  for (const title of ['Your family', 'Add your relatives', 'See the family tree', 'The menu']) {
     const step = page.getByRole('dialog', { name: title });
     await expect(step).toBeVisible();
     await step.getByRole('button', { name: 'Next' }).click();
@@ -24,7 +24,7 @@ test('a new member is shown around once, and can take the tour again', async ({ 
   const last = page.getByRole('dialog', { name: 'Your account' });
   await expect(last).toContainText('Step 6 of 6');
   await last.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('dialog', { name: 'Everything else is in the menu' }).getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('dialog', { name: 'The menu' }).getByRole('button', { name: 'Next' }).click();
   await last.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByTestId('tour')).toBeHidden();
 
@@ -41,7 +41,7 @@ test('a new member is shown around once, and can take the tour again', async ({ 
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('menuitem', { name: 'Take the tour' }).click();
   await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByRole('dialog', { name: 'Welcome to your family archive' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Welcome to your family tree' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('tour')).toBeHidden();
 

@@ -233,7 +233,7 @@ export interface MemberView extends PersonCard {
   updatedAt: string;
 }
 
-export const MEMBER_SORTS = ['name', 'birth', 'generation', 'recent'] as const;
+export const MEMBER_SORTS = ['code', 'name', 'birth', 'generation', 'recent'] as const;
 export type MemberSort = (typeof MEMBER_SORTS)[number];
 
 export interface ListMembersQuery {

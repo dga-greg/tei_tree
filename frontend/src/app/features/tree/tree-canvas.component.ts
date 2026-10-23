@@ -96,7 +96,7 @@ function fitText(text: string, font: string, maxWidth = TEXT_WIDTH): string {
         <!-- people -->
         @for (n of visibleNodes(); track n.id) {
           @if (person(n.id); as p) {
-            <g [attr.transform]="'translate(' + n.x + ',' + n.y + ')'" [attr.opacity]="nodeOpacity(n, p)">
+            <g [attr.transform]="'translate(' + n.x + ',' + n.y + ')'" [attr.opacity]="nodeOpacity(n)">
               <g class="cursor-pointer outline-none" role="button" tabindex="0" [attr.aria-label]="describe(p, n)" [attr.aria-pressed]="selectedId() === n.id"
                  (click)="selectPerson.emit(n.id)" (keydown.enter)="selectPerson.emit(n.id)" (keydown.space)="$event.preventDefault(); selectPerson.emit(n.id)"
                  (focus)="focused.set(n.id)" (blur)="focused.set(null)">
@@ -104,9 +104,6 @@ function fitText(text: string, font: string, maxWidth = TEXT_WIDTH): string {
                       [attr.stroke]="selectedId() === n.id || focused() === n.id ? theme().cardSelected : theme().cardBorder"
                       [attr.stroke-width]="selectedId() === n.id ? 3 : focused() === n.id ? 2.5 : 1"
                       [attr.stroke-dasharray]="n.role === 'partner' ? '5 3' : null" />
-                @if (lineColours()?.get(n.id); as colour) {
-                  <rect x="1" y="10" width="5" [attr.height]="H - 20" rx="2.5" [attr.fill]="colour" />
-                }
                 <circle cx="34" [attr.cy]="H / 2" r="21" [attr.fill]="theme().avatar" />
                 <text x="34" [attr.y]="H / 2 + 5" text-anchor="middle" font-size="14" font-weight="700" [attr.fill]="theme().avatarText">{{ initials(p.displayName) }}</text>
                 <text x="64" y="30" font-size="13.5" font-weight="650" [attr.fill]="theme().text">{{ clip(p.displayName, 650, 13.5) }}</text>
@@ -137,10 +134,6 @@ export class TreeCanvasComponent implements OnDestroy {
   readonly people = input.required<Map<string, TreeNode>>();
   readonly selectedId = input<string | null>(null);
   readonly highlighted = input<Set<string> | null>(null);
-  readonly generationFocus = input<number | null>(null);
-  /** Colour of each person's line (tree coloured by lineage), and the line names for screen readers. */
-  readonly lineColours = input<Map<string, string> | null>(null);
-  readonly lineNames = input<Map<string, string> | null>(null);
   readonly expanding = input<string | null>(null);
   /** The tree's accessible name; defaults to "Family tree" in the active language. */
   readonly ariaLabel = input<string>();
@@ -250,18 +243,16 @@ export class TreeCanvasComponent implements OnDestroy {
     return fitText(text, `${weight} ${size}px ${FONT_FAMILY}`);
   }
 
+  /** The family ID, with a note for the family head and people married in. */
   protected genLabel(p: TreeNode, n: LayoutNode): string {
-    const g = p.generation;
-    if (g.status === 'founder') return t('G1 · Founder');
-    if (g.number) return t('Generation {number}', { number: g.number });
-    if (g.status === 'conflict') return t('G{candidates} · conflict', { candidates: g.candidates.join('/') });
-    if (n.role === 'partner' || g.status === 'married_in') return t('Married in');
-    if (g.status === 'unverified_path') return t('Unverified link');
-    return '';
+    const code = p.familyCode ?? t('No ID yet');
+    if (p.generation.status === 'founder') return t('{code} · Family head', { code });
+    if (n.role === 'partner' || p.generation.status === 'married_in') return t('{code} · Married in', { code });
+    return code;
   }
 
   protected describe(p: TreeNode, n: LayoutNode): string {
-    const parts = [p.displayName, this.span(p), this.genLabel(p, n), p.vitalStatus === 'living' ? t('living') : '', this.lineNames()?.get(n.id) ?? ''];
+    const parts = [p.displayName, this.span(p), this.genLabel(p, n), p.vitalStatus === 'living' ? t('living') : ''];
     if (n.hiddenChildren) parts.push(t('{count, plural, one {# child not shown} other {# children not shown}}', { count: n.hiddenChildren }));
     return parts.filter(Boolean).join(', ');
   }
@@ -286,11 +277,9 @@ export class TreeCanvasComponent implements OnDestroy {
     return this.isLit(l) ? 1 : 0.15;
   }
 
-  protected nodeOpacity(n: LayoutNode, p: TreeNode): number {
+  protected nodeOpacity(n: LayoutNode): number {
     const h = this.highlighted();
     if (h) return h.has(n.id) ? 1 : 0.25;
-    const g = this.generationFocus();
-    if (g != null) return p.generation.number === g ? 1 : 0.25;
     return 1;
   }
 

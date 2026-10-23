@@ -1,5 +1,5 @@
 import { A11yModule } from '@angular/cdk/a11y';
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, linkedSignal, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
@@ -13,16 +13,15 @@ import {
   LucideSlidersHorizontal,
   LucideX,
 } from '@lucide/angular';
-import { DEFAULT_LINEAGE_SETTINGS, PARENT_CHILD_SUBTYPE_LABELS, PARTNERSHIP_SUBTYPE_LABELS, type BranchView, type LineageSide, type MemberView, type PersonCard } from '@fh/contracts';
+import { PARENT_CHILD_SUBTYPE_LABELS, PARTNERSHIP_SUBTYPE_LABELS, type MemberView, type PersonCard } from '@fh/contracts';
 import { ApiError } from '../../core/api/api-error';
 import { t } from '../../core/i18n/i18n';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { FamilyContextStore } from '../../core/families/family-context.store';
 import { MembersApi } from '../../core/members/members.api';
-import { TreeApi } from '../../core/tree/tree.api';
 import { lifespan } from '../../shared/people';
 import { AlertComponent } from '../../shared/ui/alert.component';
-import { GenerationBadgeComponent } from '../../shared/ui/generation-badge.component';
+import { FamilyCodeComponent } from '../../shared/ui/family-code.component';
 import { NoFamilyComponent } from '../../shared/ui/no-family.component';
 import { PersonAvatarComponent } from '../../shared/ui/person-avatar.component';
 import { PersonPickerComponent } from '../../shared/ui/person-picker.component';
@@ -30,10 +29,6 @@ import { SpinnerComponent } from '../../shared/ui/spinner.component';
 import { TreeCanvasComponent } from './tree-canvas.component';
 import { downloadPdf, downloadPng, downloadSvg } from './tree-export';
 import { TreeStore } from './tree.store';
-
-/** Okabe–Ito colours, distinguishable with the common forms of colour blindness; a line's name is always in the legend and the card's label too. */
-const LINE_COLOURS = ['#E69F00', '#0072B2', '#009E73', '#CC79A7', '#D55E00', '#56B4E9', '#F0E442'];
-const OTHER_LINE = '#999999';
 
 @Component({
   selector: 'fh-family-tree-page',
@@ -46,7 +41,7 @@ const OTHER_LINE = '#999999';
     TreeCanvasComponent,
     PersonPickerComponent,
     PersonAvatarComponent,
-    GenerationBadgeComponent,
+    FamilyCodeComponent,
     AlertComponent,
     SpinnerComponent,
     NoFamilyComponent,
@@ -82,46 +77,12 @@ const OTHER_LINE = '#999999';
           <section class="mt-6 space-y-3" aria-labelledby="view-h">
             <h2 id="view-h" class="text-sm font-semibold">{{ 'View' | t }}</h2>
             <div>
-              <label class="label" for="tree-branch">{{ 'Branch' | t }}</label>
-              <select id="tree-branch" class="input" [ngModel]="branchId()" (ngModelChange)="branchId.set($event || null)">
-                <option [ngValue]="null">{{ 'Whole family (from the founder)' | t }}</option>
-                @for (b of branches(); track b.id) { <option [ngValue]="b.id">{{ b.name }}</option> }
-              </select>
-            </div>
-            <div>
               <label class="label" for="tree-depth">{{ 'Generations to load' | t }}</label>
               <select id="tree-depth" class="input" [ngModel]="depth()" (ngModelChange)="depth.set(+$event)">
                 @for (d of [1, 2, 3, 4, 5, 6]; track d) { <option [ngValue]="d">{{ '{depth} below the top' | t: { depth: d } }}</option> }
               </select>
             </div>
-            @if (lineSides().length) {
-              <div>
-                <label class="label" for="tree-colour">{{ 'Colour by line' | t }}</label>
-                <select id="tree-colour" class="input" [ngModel]="colourBy()" (ngModelChange)="colourBy.set($event)">
-                  <option [ngValue]="null">{{ 'None' | t }}</option>
-                  @for (s of lineSides(); track s.side) { <option [ngValue]="s.side">{{ s.label }}</option> }
-                </select>
-              </div>
-            }
-            <div>
-              <label class="label" for="tree-gen">{{ 'Highlight a generation' | t }}</label>
-              <select id="tree-gen" class="input" [ngModel]="store.generationFocus()" (ngModelChange)="store.generationFocus.set($event)">
-                <option [ngValue]="null">{{ 'None' | t }}</option>
-                @for (g of generations(); track g) { <option [ngValue]="g">{{ 'Generation {number}' | t: { number: g } }}</option> }
-              </select>
-            </div>
           </section>
-
-          @if (lineLegend().length) {
-            <section class="mt-6" aria-labelledby="line-legend-h">
-              <h2 id="line-legend-h" class="mb-2 text-sm font-semibold">{{ colourLabel() }}</h2>
-              <ul class="space-y-1.5 text-xs text-stone-600 dark:text-stone-300">
-                @for (l of lineLegend(); track l.name) {
-                  <li class="flex items-center gap-2"><span class="inline-block h-3 w-1.5 rounded-full" [style.background]="l.colour" aria-hidden="true"></span>{{ l.name }} <span class="text-stone-400">({{ l.count }})</span></li>
-                }
-              </ul>
-            </section>
-          }
 
           <section class="mt-6" aria-labelledby="legend-h">
             <h2 id="legend-h" class="mb-2 text-sm font-semibold">{{ 'Legend' | t }}</h2>
@@ -169,9 +130,9 @@ const OTHER_LINE = '#999999';
           @if (store.error(); as e) { <fh-alert class="absolute bottom-3 left-3 right-3 z-10">{{ e }}</fh-alert> }
           @if (notice(); as n) { <fh-alert tone="info" class="absolute bottom-3 left-3 right-3 z-10">{{ n }}</fh-alert> }
           @else if (store.nodes().size === 1 && !store.loading() && !store.selectedId()) {
-            <!-- A new family: only the founding ancestor so far. -->
+            <!-- A new family: only the family head so far. -->
             <div class="card absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center gap-3 p-4 sm:left-auto sm:max-w-sm" data-testid="tree-start">
-              <p class="min-w-0 flex-1 text-sm">{{ 'The tree grows as you add people. Add the founding ancestor’s partner and children to start.' | t }}</p>
+              <p class="min-w-0 flex-1 text-sm">{{ 'The tree grows as you add people. Add the family head’s husband or wife and children to start.' | t }}</p>
               @if (context.can('member.create')) { <a routerLink="/members/new" class="btn-primary !py-1.5 text-sm">{{ 'Add family member' | t }}</a> }
             </div>
           }
@@ -182,13 +143,13 @@ const OTHER_LINE = '#999999';
           @if (!store.rootId() && !store.loading()) {
             <div class="flex h-full items-center justify-center p-6 text-center">
               <div class="max-w-sm">
-                <p class="font-semibold">{{ 'No founding ancestor yet' | t }}</p>
-                <p class="mt-1 text-sm text-stone-500">{{ 'The tree starts from the founding ancestor. Choose one in the family settings.' | t }}</p>
+                <p class="font-semibold">{{ 'No family head yet' | t }}</p>
+                <p class="mt-1 text-sm text-stone-500">{{ 'The tree starts from the family head (G1). Choose one in the family settings.' | t }}</p>
                 @if (context.can('family.set_founder')) { <a routerLink="/family/settings" class="btn-secondary mt-4">{{ 'Family settings' | t }}</a> }
               </div>
             </div>
           } @else {
-            <fh-tree-canvas [layout]="store.layout()" [people]="store.nodes()" [selectedId]="store.selectedId()" [highlighted]="store.highlighted()" [generationFocus]="store.generationFocus()" [lineColours]="lineColours()" [lineNames]="lineNames()" [expanding]="store.expanding()" [ariaLabel]="'Family tree of the {family}. Use Tab to move between people and Enter to select.' | t: { family: context.active()!.name }" (selectPerson)="select($event)" (togglePerson)="store.toggle($event)" />
+            <fh-tree-canvas [layout]="store.layout()" [people]="store.nodes()" [selectedId]="store.selectedId()" [highlighted]="store.highlighted()" [expanding]="store.expanding()" [ariaLabel]="'Family tree of the {family}. Use Tab to move between people and Enter to select.' | t: { family: context.active()!.name }" (selectPerson)="select($event)" (togglePerson)="store.toggle($event)" />
           }
         </section>
 
@@ -201,7 +162,7 @@ const OTHER_LINE = '#999999';
                 <div class="min-w-0 flex-1">
                   <h2 class="text-xl font-semibold leading-tight">{{ p.displayName }}</h2>
                   <p class="text-sm text-stone-500">{{ span(p) || '—' }}</p>
-                  <fh-generation-badge class="mt-1.5" [generation]="p.generation" />
+                  <fh-family-code class="mt-1.5 block" [code]="p.familyCode" />
                 </div>
                 <button type="button" class="btn-ghost !p-1.5" (click)="store.selectedId.set(null); store.setHighlight(null)" [attr.aria-label]="'Close person panel' | t"><svg lucideX class="size-4"></svg></button>
               </div>
@@ -259,23 +220,15 @@ const OTHER_LINE = '#999999';
   `,
 })
 export class FamilyTreePage {
-  /** Query parameters: focus a person, or open a branch. */
+  /** Query parameter: focus a person. */
   readonly focus = input<string>();
-  readonly branch = input<string>();
-  /** `a,b`: highlight the relationship path between two people. */
-  readonly path = input<string>();
-  /** `maternal` or `paternal`: colour people by their line. */
-  readonly colour = input<LineageSide>();
 
   protected readonly context = inject(FamilyContextStore);
   protected readonly store = inject(TreeStore);
-  private readonly treeApi = inject(TreeApi);
   private readonly membersApi = inject(MembersApi);
   protected readonly canvas = viewChild(TreeCanvasComponent);
   private readonly shell = viewChild<ElementRef<HTMLElement>>('shell');
 
-  protected readonly branches = signal<BranchView[]>([]);
-  protected readonly branchId = signal<string | null>(null);
   protected readonly depth = signal(3);
   protected readonly filtersOpen = signal(false);
   protected readonly detail = signal<MemberView | null>(null);
@@ -283,49 +236,6 @@ export class FamilyTreePage {
   protected readonly exporting = signal(false);
   protected readonly isFullscreen = signal(false);
   protected readonly span = lifespan;
-
-  protected readonly colourBy = linkedSignal<LineageSide | null>(() => this.colour() ?? null);
-  protected readonly lineSides = computed(() => {
-    const l = this.context.details()?.lineage ?? DEFAULT_LINEAGE_SETTINGS;
-    return (['maternal', 'paternal'] as const).filter((s) => l[s].enabled).map((side) => ({ side, label: l[side].label }));
-  });
-  protected readonly colourLabel = computed(() => this.lineSides().find((s) => s.side === this.colourBy())?.label ?? '');
-  /** Lines among the people shown, most common first, each with a colour (Okabe–Ito, readable with colour blindness). */
-  protected readonly lineLegend = computed(() => {
-    const side = this.colourBy();
-    if (!side) return [];
-    const counts = new Map<string, number>();
-    for (const n of this.store.nodes().values()) {
-      const name = n.lineage?.[side];
-      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-    const sorted = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    const named = sorted.slice(0, LINE_COLOURS.length).map(([name, count], i) => ({ name, count, colour: LINE_COLOURS[i]! }));
-    const rest = sorted.slice(LINE_COLOURS.length);
-    return rest.length ? [...named, { name: t('Other lines'), count: rest.reduce((n, [, c]) => n + c, 0), colour: OTHER_LINE }] : named;
-  });
-  protected readonly lineColours = computed(() => {
-    const side = this.colourBy();
-    if (!side) return null;
-    const colour = new Map(this.lineLegend().map((l) => [l.name, l.colour]));
-    const out = new Map<string, string>();
-    for (const n of this.store.nodes().values()) {
-      const name = n.lineage?.[side];
-      if (name) out.set(n.id, colour.get(name) ?? OTHER_LINE);
-    }
-    return out;
-  });
-  protected readonly lineNames = computed(() => {
-    const side = this.colourBy();
-    if (!side) return null;
-    return new Map([...this.store.nodes().values()].filter((n) => n.lineage?.[side]).map((n) => [n.id, `${this.colourLabel()} ${n.lineage![side]}`]));
-  });
-
-  protected readonly generations = computed(() => {
-    const nums = new Set<number>();
-    for (const n of this.store.nodes().values()) if (n.generation.number) nums.add(n.generation.number);
-    return [...nums].sort((a, b) => a - b);
-  });
 
   protected readonly highlightModes = [
     { mode: 'ancestors' as const, label: t('Ancestors') },
@@ -343,27 +253,14 @@ export class FamilyTreePage {
 
   constructor() {
     document.addEventListener('fullscreenchange', () => this.isFullscreen.set(!!document.fullscreenElement));
-    let initialised = false;
     effect(() => {
       const family = this.context.active();
-      const branchId = this.branchId();
       const depth = this.depth();
       if (!family) return;
       untracked(async () => {
-        if (!initialised) {
-          initialised = true;
-          if (this.branch()) {
-            this.branchId.set(this.branch()!);
-            return; // the effect re-runs with the branch
-          }
-        }
-        this.treeApi.branches(family.id).then((b) => this.branches.set(b)).catch(() => undefined);
-        if (branchId) await this.store.loadBranch(family.id, branchId, depth);
-        else await this.store.loadRoot(family.id, depth);
+        await this.store.loadRoot(family.id, depth);
         const focus = this.focus();
-        const path = this.path()?.split(',');
-        if (path?.length === 2 && !this.store.pathHighlight()) await this.showPath(family.id, path[0]!, path[1]!);
-        else if (focus && !this.store.selectedId()) await this.onPicked({ id: focus } as PersonCard);
+        if (focus && !this.store.selectedId()) await this.onPicked({ id: focus } as PersonCard);
         setTimeout(() => this.canvas()?.initialView());
       });
     });
@@ -388,35 +285,7 @@ export class FamilyTreePage {
     if (placed) setTimeout(() => this.canvas()?.centerOn(p.id), 50);
     else {
       const name = p.displayName ?? t('This person');
-      this.notice.set(
-        this.branchId()
-          ? t('{name} is not connected to this branch by recorded parent–child links, so they do not appear in this tree.', { name })
-          : t('{name} is not connected to the founding ancestor by recorded parent–child links, so they do not appear in this tree.', { name }),
-      );
-    }
-  }
-
-  /** Opens the lines to both people and highlights the chain between them. */
-  private async showPath(familyId: string, a: string, b: string): Promise<void> {
-    try {
-      const r = await this.membersApi.between(familyId, a, b);
-      for (const p of r.path.people) await this.store.focus(p.id);
-      this.store.selectedId.set(a);
-      this.store.pathHighlight.set(new Set(r.path.people.map((p) => p.id)));
-      const hidden = r.path.people.filter((p) => !this.store.layout().nodes.some((n) => n.id === p.id));
-      this.notice.set(
-        `${r.summary}` +
-          (hidden.length
-            ? ' ' +
-              t('{count, plural, one {({names} is outside this tree view.)} other {({names} are outside this tree view.)}}', {
-                count: hidden.length,
-                names: hidden.map((p) => p.displayName).join(', '),
-              })
-            : ''),
-      );
-      setTimeout(() => this.canvas()?.fit(), 50);
-    } catch (err) {
-      this.store.error.set(ApiError.from(err).message);
+      this.notice.set(t('{name} is not connected to the family head by recorded parent–child links, so they do not appear in this tree.', { name }));
     }
   }
 
@@ -426,7 +295,6 @@ export class FamilyTreePage {
 
   protected resetView(): void {
     this.store.setHighlight(null);
-    this.store.generationFocus.set(null);
     this.canvas()?.reset();
   }
 
@@ -444,7 +312,7 @@ export class FamilyTreePage {
     const parentNote = (s: string, v: string) => [subtypeLabel(s), v === 'verified' ? '' : (verification[v] ?? v)].filter(Boolean).join(' · ');
     return [
       { title: t('Parents'), people: d.relatives.parents.map((r) => ({ person: r.person, note: parentNote(r.subtype, r.verification) })) },
-      { title: t('Partners'), people: d.relatives.partners.map((r) => ({ person: r.person, note: t(PARTNERSHIP_SUBTYPE_LABELS[r.subtype as keyof typeof PARTNERSHIP_SUBTYPE_LABELS] ?? '') })) },
+      { title: t('Husband or wife'), people: d.relatives.partners.map((r) => ({ person: r.person, note: t(PARTNERSHIP_SUBTYPE_LABELS[r.subtype as keyof typeof PARTNERSHIP_SUBTYPE_LABELS] ?? '') })) },
       { title: t('Children'), people: d.relatives.children.map((r) => ({ person: r.person, note: parentNote(r.subtype, r.verification) })) },
       { title: t('Siblings'), people: d.relatives.siblings.map((r) => ({ person: r.person, note: r.kind === 'full' ? t('Full sibling') : r.kind === 'half' ? t('Half-sibling') : t('Step / adoptive') })) },
     ];

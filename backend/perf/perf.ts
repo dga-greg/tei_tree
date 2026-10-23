@@ -19,11 +19,9 @@ import { createLogger } from '../src/core/logger.js';
 import { fuzzyDateSortKey } from '@fh/contracts';
 import { MemoryMailer } from '../src/infra/mailer.js';
 import { syncIndexes } from '../src/infra/mongo.js';
-import { FamilyEventModel } from '../src/modules/events/event.model.js';
 import { FamilyMemberModel } from '../src/modules/members/member.model.js';
 import { searchFields } from '../src/modules/members/members.service.js';
 import { RelationshipModel } from '../src/modules/relationships/relationship.model.js';
-import { FamilyStoryModel } from '../src/modules/stories/story.model.js';
 import { UserModel } from '../src/modules/users/user.model.js';
 
 const PEOPLE = Number(process.env['PERF_PEOPLE'] ?? 20_000);
@@ -36,18 +34,11 @@ const BUDGETS: Record<string, number> = {
   'members list (page 1)': 250,
   'members search': 200,
   'person profile': 200,
-  'relationship finder (warm)': 150,
   dashboard: 800,
-  'generations summary': 500,
-  'timeline (one person)': 300,
-  'stories list': 200,
-  'media list': 200,
 };
 /** Single-run budgets for heavy operations. */
 const ONE_OFF_BUDGETS: Record<string, number> = {
-  'relationship finder (cold, loads the graph)': 3000,
   'generation recalculation (whole family)': 15000,
-  'GEDCOM export (whole family)': 15000,
 };
 
 const FIRST = ['Kwame', 'Ama', 'Yaw', 'Akosua', 'Kwesi', 'Efua', 'Kojo', 'Adwoa', 'Kwaku', 'Abena', 'Kwabena', 'Afia', 'Kofi', 'Esi', 'Yaa', 'Akua', 'Fiifi', 'Ekow', 'Araba', 'Nana'];
@@ -131,9 +122,6 @@ async function main(): Promise<void> {
   for (let i = 0; i < people.length; i += 5000) await FamilyMemberModel.insertMany(people.slice(i, i + 5000), { lean: true });
   for (let i = 0; i < edges.length; i += 5000) await RelationshipModel.insertMany(edges.slice(i, i + 5000), { lean: true });
   const deepest = frontier[0]?.id ?? founder;
-  const cousin = frontier.at(-1)?.id ?? founder;
-  await FamilyEventModel.insertMany(Array.from({ length: 300 }, (_, i) => ({ familyId, kind: 'reunion', title: `Reunion ${i}`, date: { year: 1850 + i % 170, qualifier: 'exact', sortKey: (1850 + (i % 170)) * 10000 }, memberIds: [founder], createdBy: userId })));
-  await FamilyStoryModel.insertMany(Array.from({ length: 500 }, (_, i) => ({ familyId, kind: 'story', title: `Story ${i}`, body: 'Once upon a time. '.repeat(50), memberIds: [founder], createdBy: userId, status: 'published', searchText: `story ${i}` })));
   const seedMs = performance.now() - t0;
   console.log(`Seeded ${people.length + 1} people and ${edges.length} relationships in ${(seedMs / 1000).toFixed(1)} s`);
 
@@ -163,19 +151,13 @@ async function main(): Promise<void> {
   };
 
   await oneOff('generation recalculation (whole family)', () => agent.post(`${base}/generations/recalculate`).set('X-XSRF-TOKEN', csrf).send({}).expect(202));
-  await oneOff('relationship finder (cold, loads the graph)', () => get(`${base}/relationships/between?a=${deepest.toString()}&b=${cousin.toString()}`));
-  await repeated('relationship finder (warm)', () => get(`${base}/relationships/between?a=${deepest.toString()}&b=${cousin.toString()}`));
   await repeated('tree root (depth 3)', () => get(`${base}/tree/root?depth=3`));
   await repeated('tree descendants (depth 4)', () => get(`${base}/tree/nodes/${founder.toString()}/descendants?depth=4`));
   await repeated('members list (page 1)', () => get(`${base}/members?page=1&pageSize=24`));
   await repeated('members search', () => get(`${base}/members/search?q=kwa`));
+  await repeated('members by family ID', () => get(`${base}/members?q=G1.2&page=1&pageSize=24`));
   await repeated('person profile', () => get(`${base}/members/${deepest.toString()}`));
   await repeated('dashboard', () => get(`${base}/dashboard`));
-  await repeated('generations summary', () => get(`${base}/generations`));
-  await repeated('timeline (one person)', () => get(`${base}/timeline?memberId=${founder.toString()}`));
-  await repeated('stories list', () => get(`${base}/stories`));
-  await repeated('media list', () => get(`${base}/media`));
-  await oneOff('GEDCOM export (whole family)', () => get(`${base}/export?format=gedcom`));
 
   console.log(`\n${people.length + 1} people · ${RUNS} runs per endpoint\n`);
   console.log('Operation'.padEnd(46) + 'p50 ms'.padStart(9) + 'p95 ms'.padStart(9) + 'budget'.padStart(9) + '  ');

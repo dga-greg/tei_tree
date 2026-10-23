@@ -300,6 +300,14 @@ export class MembersService {
             ? { createdAt: -1 }
             : { surname: 1, firstName: 1 };
 
+    // In family ID order: G1, G1-W1, G1.1, G1.1.1, …, then people without an ID by name.
+    if (query.sort === 'code') {
+      const docs = (await FamilyMemberModel.find(match).sort({ surname: 1, firstName: 1, _id: 1 })).filter((d) => policy.isVisible(d));
+      const ordered = [...docs.filter((d) => d.familyCode).sort((a, b) => compareFamilyCodes(a.familyCode!, b.familyCode!)), ...docs.filter((d) => !d.familyCode)];
+      const rows = ordered.slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
+      return { data: rows.map((d) => toPersonCard(d, policy)), meta: pageMeta(query, ordered.length) };
+    }
+
     // Without a search there is nothing to score: an indexed find plus a count avoids sorting the whole family.
     if (!tokens.length) {
       const [docs, total] = await Promise.all([

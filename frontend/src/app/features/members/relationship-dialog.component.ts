@@ -12,7 +12,6 @@ import {
   type VerificationState,
 } from '@fh/contracts';
 import { ApiError } from '../../core/api/api-error';
-import { CollaborationApi } from '../../core/collaboration/collaboration.api';
 import { MembersApi } from '../../core/members/members.api';
 import { AlertComponent } from '../../shared/ui/alert.component';
 import { fuzzyDateForm, fuzzyDateValue, FuzzyDateFieldComponent } from '../../shared/ui/fuzzy-date-field.component';
@@ -28,11 +27,9 @@ export interface RelationshipDialogData {
   kind: RelationKind;
   /** Ids already linked, so they are not offered again. */
   exclude: string[];
-  /** Submit the link as a suggestion for review instead of saving it. */
-  propose?: boolean;
 }
 
-export type RelationshipDialogResult = 'saved' | 'proposed' | false;
+export type RelationshipDialogResult = 'saved' | false;
 
 /** Links an existing person as a parent, child or partner of the profile being viewed. */
 @Component({
@@ -76,16 +73,9 @@ export type RelationshipDialogResult = 'saved' | 'proposed' | false;
         <fh-fuzzy-date-field [label]="'Start (e.g. marriage)' | t" [form]="start" />
         <fh-fuzzy-date-field [label]="'End' | t" [form]="end" />
       }
-      @if (data.propose) {
-        <div>
-          <label class="label" for="rel-note">{{ 'How do you know?' | t }} <span class="font-normal text-stone-500">{{ '(optional)' | t }}</span></label>
-          <textarea id="rel-note" class="input min-h-20" maxlength="2000" formControlName="note"></textarea>
-          <p class="mt-1.5 text-xs text-stone-500">{{ 'A moderator reviews the link before it appears in the tree.' | t }}</p>
-        </div>
-      }
       <div class="flex justify-end gap-2">
         <button type="button" class="btn-secondary" (click)="ref.close(false)">{{ 'Cancel' | t }}</button>
-        <button type="submit" class="btn-primary" [disabled]="!other() || busy()">{{ (data.propose ? 'Send suggestion' : 'Save relationship') | t }}</button>
+        <button type="submit" class="btn-primary" [disabled]="!other() || busy()">{{ 'Save relationship' | t }}</button>
       </div>
     </form>
   `,
@@ -94,10 +84,9 @@ export class RelationshipDialogComponent {
   protected readonly data = inject<RelationshipDialogData>(DIALOG_DATA);
   protected readonly ref = inject<DialogRef<RelationshipDialogResult>>(DialogRef);
   private readonly membersApi = inject(MembersApi);
-  private readonly collaboration = inject(CollaborationApi);
 
   protected readonly title = this.titleText();
-  protected readonly pickerLabel = this.data.kind === 'parent' ? t('Parent') : this.data.kind === 'child' ? t('Child') : t('Partner');
+  protected readonly pickerLabel = this.data.kind === 'parent' ? t('Parent') : this.data.kind === 'child' ? t('Child') : t('Husband or wife');
   protected readonly subtypes =
     this.data.kind === 'partner'
       ? PARTNERSHIP_SUBTYPES.map((s) => ({ value: s, label: PARTNERSHIP_SUBTYPE_LABELS[s] }))
@@ -114,7 +103,6 @@ export class RelationshipDialogComponent {
     subtype: [this.data.kind === 'partner' ? 'marriage' : 'biological'],
     status: ['current'],
     verification: ['verified' as VerificationState],
-    note: [''],
   });
   protected readonly start = fuzzyDateForm();
   protected readonly end = fuzzyDateForm();
@@ -124,14 +112,13 @@ export class RelationshipDialogComponent {
 
   private titleText(): string {
     const name = this.data.person.displayName;
-    const propose = !!this.data.propose;
     switch (this.data.kind) {
       case 'parent':
-        return propose ? t('Suggest a parent of {name}', { name }) : t('Add a parent of {name}', { name });
+        return t('Add a parent of {name}', { name });
       case 'child':
-        return propose ? t('Suggest a child of {name}', { name }) : t('Add a child of {name}', { name });
+        return t('Add a child of {name}', { name });
       default:
-        return propose ? t('Suggest a partner of {name}', { name }) : t('Add a partner of {name}', { name });
+        return t('Add a husband or wife of {name}', { name });
     }
   }
 
@@ -162,13 +149,8 @@ export class RelationshipDialogComponent {
               subtype: v.subtype as never,
               verification: v.verification,
             };
-      if (this.data.propose) {
-        await this.collaboration.propose(this.data.familyId, { kind: 'relationship.create', payload: body, note: v.note.trim() || undefined });
-        this.ref.close('proposed');
-      } else {
-        await this.membersApi.addRelationship(this.data.familyId, body);
-        this.ref.close('saved');
-      }
+      await this.membersApi.addRelationship(this.data.familyId, body);
+      this.ref.close('saved');
     } catch (err) {
       this.error.set(ApiError.from(err));
     } finally {

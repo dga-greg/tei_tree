@@ -56,11 +56,8 @@ test('add a person with a photo, change it from their page, and remove it', asyn
   // Straight from the profile.
   await page.locator('header').getByTestId('profile-photo-input').setInputFiles(await picture(page, '#8f6a0c'));
   await crop(page);
-  await expect(page.getByText("This is now Esi Mensah's profile photo.")).toBeVisible();
+  await expect(page.getByText("This is now Esi Mensah's photo.")).toBeVisible();
   await expect(avatar).not.toHaveAttribute('src', first!);
-
-  // Both photos are in the archive, tagged with her.
-  await expect(page.locator('fh-media-grid').getByRole('button', { name: /Profile photo of Esi Mensah/ })).toHaveCount(2);
 
   await page.getByRole('link', { name: 'Edit' }).click();
   await page.getByRole('button', { name: 'Remove photo' }).click();

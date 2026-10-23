@@ -12,7 +12,7 @@ export async function cropPhoto(dialog: Dialog, file: File): Promise<File | null
 }
 
 /**
- * Adds the picture to the family's Photos & Documents, tagged with the person, as their profile photo. It shows at
+ * Uploads the picture as the person's profile photo. It shows at
  * once, or after a moderator approves it when the viewer's uploads are reviewed (status `pending_approval`).
  */
 export function uploadProfilePhoto(archive: ArchiveApi, familyId: string, person: { id: string; displayName: string }, file: File): Promise<MediaView> {

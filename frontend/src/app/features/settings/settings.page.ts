@@ -17,18 +17,30 @@ import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { AlertComponent } from '../../shared/ui/alert.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { SpinnerComponent } from '../../shared/ui/spinner.component';
-import { AccountDataComponent } from './account-data.component';
 import { PasswordRevealComponent } from '../../shared/ui/password-reveal.component';
 import { SecuritySettingsComponent } from './security-settings.component';
-import { LanguagePickerComponent } from '../../shared/ui/language-picker.component';
-import { NotificationSettingsComponent } from './notification-settings.component';
+import { RouterLink } from '@angular/router';
+import { LucideTreePine } from '@lucide/angular';
+import { FamilyContextStore } from '../../core/families/family-context.store';
 
 @Component({
   selector: 'fh-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, PasswordRevealComponent, ReactiveFormsModule, DatePipe, FormFieldComponent, AlertComponent, SpinnerComponent, LucideMonitor, LucideSmartphone, AccountDataComponent, NotificationSettingsComponent, SecuritySettingsComponent, LanguagePickerComponent],
+  imports: [TranslatePipe, PasswordRevealComponent, ReactiveFormsModule, DatePipe, FormFieldComponent, AlertComponent, SpinnerComponent, LucideMonitor, LucideSmartphone, SecuritySettingsComponent, RouterLink, LucideTreePine],
   template: `
     <h1 class="mb-8 text-3xl font-semibold">{{ 'Settings' | t }}</h1>
+    @if (families.active(); as f) {
+      <section class="card mb-6 flex flex-wrap items-center gap-4 p-6" aria-labelledby="family-heading">
+        <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-800 dark:bg-brand-900 dark:text-brand-100"><svg lucideTreePine class="size-6"></svg></span>
+        <div class="min-w-0 flex-1">
+          <h2 id="family-heading" class="text-lg font-semibold">{{ 'Family' | t }}: {{ f.name }}</h2>
+          <p class="text-sm text-stone-500">{{ 'The family name, its description, and who is the family head (G1).' | t }}</p>
+        </div>
+        @if (families.can('family.update')) {
+          <a routerLink="/family/settings" class="btn-secondary">{{ 'Family settings' | t }}</a>
+        }
+      </section>
+    }
     <div class="grid gap-6 lg:grid-cols-2">
       <!-- Profile -->
       <section class="card p-6" aria-labelledby="profile-heading">
@@ -62,7 +74,6 @@ import { NotificationSettingsComponent } from './notification-settings.component
           </fieldset>
           <button type="submit" class="btn-primary" [disabled]="busy() === 'profile'">{{ 'Save profile' | t }}</button>
         </form>
-        <div class="mt-6 border-t border-stone-200 pt-5 dark:border-stone-800"><fh-language-picker /></div>
       </section>
 
       <!-- Password -->
@@ -120,16 +131,13 @@ import { NotificationSettingsComponent } from './notification-settings.component
         }
       </section>
     </div>
-    <div class="mt-6"><fh-notification-settings /></div>
-    <div class="mt-6"><fh-account-data [deletedFamily]="deleted()" /></div>
   `,
 })
 export class SettingsPage {
-  /** Query parameter set after a family was scheduled for deletion. */
-  readonly deleted = input<string>();
   /** Query parameter set after coming back from linking a Google account. */
   readonly google = input<string>();
   protected readonly auth = inject(AuthStore);
+  protected readonly families = inject(FamilyContextStore);
   private readonly authApi = inject(AuthApi);
   private readonly fb = inject(NonNullableFormBuilder);
   protected readonly minLength = PASSWORD_MIN_LENGTH;

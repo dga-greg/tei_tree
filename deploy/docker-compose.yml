@@ -22,9 +22,6 @@ x-api-env: &api-env
   CSRF_SECRET: ${CSRF_SECRET:?set CSRF_SECRET in deploy/.env}
   SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
   MAIL_FROM: ${MAIL_FROM:-Family Heritage <no-reply@localhost>}
-  # Phone notifications: make a key pair with `npm run vapid -w backend` (leave empty to turn them off).
-  WEB_PUSH_PUBLIC_KEY: ${WEB_PUSH_PUBLIC_KEY:-}
-  WEB_PUSH_PRIVATE_KEY: ${WEB_PUSH_PRIVATE_KEY:-}
   # "Continue with Google" (optional): a Google OAuth client; its redirect URI is <APP_ORIGIN>/api/v1/auth/google/callback.
   GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

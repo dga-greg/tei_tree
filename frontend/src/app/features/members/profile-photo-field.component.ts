@@ -29,7 +29,7 @@ import { cropPhoto } from './profile-photo';
         </div>
         <p class="mt-1.5 text-xs text-stone-500">
           @if (review()) { {{ 'A moderator checks new photos before the family sees them.' | t }} }
-          @else { {{ 'You can crop it after choosing it. It is also kept in Photos & Documents.' | t }} }
+          @else { {{ 'You can crop it after choosing it.' | t }} }
         </p>
       </div>
     </div>

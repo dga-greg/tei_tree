@@ -18,22 +18,22 @@ export interface TourStep {
  */
 export const TOUR_STEPS: readonly TourStep[] = [
   {
-    title: mark('Welcome to your family archive'),
+    title: mark('Welcome to your family tree'),
     body: mark('A quick look around: it takes less than a minute. You can leave at any time, and take the tour again from your account menu.'),
   },
   { target: 'family', title: mark('Your family'), body: mark('This is the family you are looking at. If you belong to more than one, switch between them here.') },
   {
     target: 'add-member',
     title: mark('Add your relatives'),
-    body: mark('Start here. Add the founding ancestor’s partner and children, then keep going down to yourself. Every person you add fills in the tree, the generations and the calendar.'),
+    body: mark('Start here. Add the family head’s husband or wife and children, then keep going down. Each person gets a family ID: the head is G1, their children G1.1, G1.2 and so on.'),
   },
-  { target: 'tree', title: mark('See the family tree'), body: mark('The whole family, from the founding ancestor down. Zoom, drag, and tap a person to see their details.') },
+  { target: 'tree', title: mark('See the family tree'), body: mark('The whole family, from the family head down. Zoom, drag, and tap a person to see their details.') },
   {
     target: 'nav',
-    title: mark('Everything else is in the menu'),
-    body: mark('Family history, the calendar, ceremonies, funds, places, the family book and more.'),
+    title: mark('The menu'),
+    body: mark('Dashboard, Family Tree, Family Members and Settings are always here.'),
   },
-  { target: 'account', title: mark('Your account'), body: mark('Your profile, language, appearance and two-step sign-in. You can take this tour again from here.') },
+  { target: 'account', title: mark('Your account'), body: mark('Your profile, appearance and two-step sign-in. You can take this tour again from here.') },
 ];
 
 /** Set on this device as soon as the tour ends, so it does not come back while the account is being updated. */

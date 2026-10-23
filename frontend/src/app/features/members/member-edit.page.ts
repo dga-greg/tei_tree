@@ -13,36 +13,24 @@ import {
 import { ApiError } from '../../core/api/api-error';
 import { ArchiveApi } from '../../core/archive/archive.api';
 import { FamilyContextStore } from '../../core/families/family-context.store';
-import { CollaborationApi } from '../../core/collaboration/collaboration.api';
 import { MembersApi } from '../../core/members/members.api';
 import { AlertComponent } from '../../shared/ui/alert.component';
 import { NoFamilyComponent } from '../../shared/ui/no-family.component';
 import { SpinnerComponent } from '../../shared/ui/spinner.component';
-import { changedFields, memberForm, memberInputFrom, type MemberForm } from './member-fields';
+import { memberForm, memberInputFrom, type MemberForm } from './member-fields';
 import { MemberFieldsComponent } from './member-fields.component';
-import { uploadMode } from '../media/media.page';
 import { ProfilePhotoFieldComponent } from './profile-photo-field.component';
 import { uploadProfilePhoto } from './profile-photo';
 import { mark, t } from '../../core/i18n/i18n';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 type Relation = 'childOf' | 'parentOf' | 'partnerOf';
-/**
- * - `edit` / `create`: the viewer may change the record directly.
- * - `own`: the viewer's claimed profile; personal details save directly, genealogical facts are proposed.
- * - `propose` / `propose-create`: everything is submitted for review.
- */
+
 /** Shown on the person's page after saving (router state). */
 export interface ProfileNotice {
   tone: 'info' | 'error';
   text: string;
 }
-
-type Mode = 'create' | 'edit' | 'own' | 'propose' | 'propose-create';
-
-/** Fields people may keep up to date on their own claimed profile (mirrors the server). */
-const OWN_PROFILE_FIELDS = new Set(['profilePhotoMediaId', 'preferredName', 'biography', 'education', 'occupations', 'achievements', 'contact', 'nationality', 'hometown', 'privacy']);
-
 
 /** Add a person (optionally already linked to a relative) or edit an existing one. */
 @Component({
@@ -57,19 +45,13 @@ const OWN_PROFILE_FIELDS = new Set(['profilePhotoMediaId', 'preferredName', 'bio
     } @else if (form(); as f) {
       <header class="mb-6">
         <h1 class="text-3xl font-semibold">{{ heading() }}</h1>
-        @if (relative(); as r) {
-          <p class="mt-1 text-stone-600 dark:text-stone-400">{{ relationText() }} <strong>{{ r.displayName }}</strong>.</p>
+        @if (existing()?.familyCode; as code) {
+          <p class="mt-1 text-sm text-stone-500">{{ 'Family ID {code}' | t: { code } }}</p>
         }
-        @switch (mode()) {
-          @case ('propose') {
-            <fh-alert tone="info" class="mt-4 block max-w-4xl">{{ "Your changes are sent to the family's moderators as a suggestion. Nothing changes until one of them approves it." | t }}</fh-alert>
-          }
-          @case ('propose-create') {
-            <fh-alert tone="info" class="mt-4 block max-w-4xl">{{ 'This person is added once a moderator approves your suggestion.' | t }}</fh-alert>
-          }
-          @case ('own') {
-            <fh-alert tone="info" class="mt-4 block max-w-4xl">{{ 'This is your profile. Personal details (biography, work, education, contact, hometown, privacy) save straight away; changes to names, dates and life status are sent for review.' | t }}</fh-alert>
-          }
+        @if (relative(); as r) {
+          <p class="mt-1 text-stone-600 dark:text-stone-400">{{ relationText() }} <strong>{{ r.displayName }}</strong>@if (r.familyCode) { ({{ r.familyCode }}) }.</p>
+        } @else if (!existing()) {
+          <p class="mt-1 text-sm text-stone-500">{{ 'Their family ID is given once they are linked to a parent or partner in the family.' | t }}</p>
         }
       </header>
 
@@ -77,7 +59,7 @@ const OWN_PROFILE_FIELDS = new Set(['profilePhotoMediaId', 'preferredName', 'bio
         @if (!e.details.length || !hasFieldErrors()) { <fh-alert class="mb-6">{{ e.message }}</fh-alert> }
       }
 
-      <form (submit)="$event.preventDefault(); save(f)" class="max-w-4xl space-y-6" novalidate>
+      <form (submit)="$event.preventDefault(); save(f)" class="max-w-3xl space-y-6" novalidate>
         @if (relative()) {
           <section class="card grid gap-4 p-6 sm:grid-cols-2" [formGroup]="linkForm" [attr.aria-label]="'Relationship' | t">
             <div>
@@ -96,24 +78,16 @@ const OWN_PROFILE_FIELDS = new Set(['profilePhotoMediaId', 'preferredName', 'bio
             </div>
           </section>
         }
-        @if (photoAllowed()) {
+        @if (canPhoto()) {
           <div class="card p-6">
-            <fh-profile-photo-field [name]="existing()?.displayName ?? ''" [current]="existing()?.photoUrl ?? null" [review]="uploads() === 'review'" [(value)]="photo" />
+            <fh-profile-photo-field [name]="existing()?.displayName ?? ''" [current]="existing()?.photoUrl ?? null" [review]="false" [(value)]="photo" />
           </div>
         }
         <div class="card p-6">
           <fh-member-fields [form]="f" [error]="error()" [errorPrefix]="errorPrefix()" />
         </div>
-        @if (mode() !== 'edit' && mode() !== 'create') {
-          <div class="card p-6">
-            <label class="label" for="proposal-note">{{ 'How do you know?' | t }} <span class="font-normal text-stone-500">{{ '(optional, helps the reviewer)' | t }}</span></label>
-            <textarea id="proposal-note" class="input min-h-24" maxlength="2000" [value]="note()" (input)="note.set($any($event.target).value)"
-                      [placeholder]="'A document, a family record, what a relative remembers…' | t"></textarea>
-          </div>
-        }
-        @if (nothingChanged()) { <fh-alert tone="info">{{ 'You have not changed anything yet.' | t }}</fh-alert> }
         <div class="flex gap-3">
-          <button type="submit" class="btn-primary" [disabled]="busy()">{{ busy() ? ('Saving…' | t) : submitLabel() }}</button>
+          <button type="submit" class="btn-primary" [disabled]="busy()">{{ busy() ? ('Saving…' | t) : existing() ? ('Save changes' | t) : ('Add person' | t) }}</button>
           <a [routerLink]="id() ? ['/members', id()] : relative() ? ['/members', relative()!.id] : ['/members']" class="btn-secondary">{{ 'Cancel' | t }}</a>
         </div>
       </form>
@@ -132,7 +106,6 @@ export class MemberEditPage {
 
   protected readonly context = inject(FamilyContextStore);
   private readonly membersApi = inject(MembersApi);
-  private readonly collaboration = inject(CollaborationApi);
   private readonly archive = inject(ArchiveApi);
   private readonly router = inject(Router);
 
@@ -142,35 +115,14 @@ export class MemberEditPage {
   protected readonly busy = signal(false);
   protected readonly error = signal<ApiError | null>(null);
   protected readonly loadError = signal<string | null>(null);
-  protected readonly note = signal('');
-  protected readonly nothingChanged = signal(false);
   /** A new cropped photo, `null` to remove the current one, `undefined` when unchanged. */
   protected readonly photo = signal<File | null | undefined>(undefined);
-  protected readonly uploads = computed(() => uploadMode(this.context));
-  /** Suggestions go through review as a whole; photos are added from the profile or Photos & Documents instead. */
-  protected readonly photoAllowed = computed(() => {
-    const mode = this.mode();
-    return (mode === 'create' || mode === 'edit' || mode === 'own') && this.uploads() !== null;
-  });
+  protected readonly canPhoto = computed(() => this.context.can('media.upload'));
 
-  protected readonly mode = computed<Mode>(() => {
-    const m = this.existing();
-    if (this.id()) {
-      if (!m) return 'edit';
-      return m.viewerCan.update ? 'edit' : m.viewerCan.editOwn ? 'own' : 'propose';
-    }
-    const rel = this.relative();
-    const direct = rel ? rel.viewerCan.manageRelationships : this.context.can('member.create');
-    return direct ? 'create' : 'propose-create';
-  });
   protected readonly heading = computed(() => {
-    const name = this.existing()?.displayName ?? '';
-    const mode = this.mode();
-    if (mode === 'edit') return t('Edit {name}', { name });
-    if (mode === 'propose') return t('Suggest a correction to {name}', { name });
-    return t({ create: mark('Add a person'), 'propose-create': mark('Suggest a new relative'), own: mark('Edit your profile') }[mode]);
+    const m = this.existing();
+    return m ? t('Edit {name}', { name: m.displayName }) : t('Add a person');
   });
-  protected readonly submitLabel = computed(() => t({ create: mark('Add person'), 'propose-create': mark('Send suggestion'), edit: mark('Save changes'), own: mark('Save'), propose: mark('Send suggestion') }[this.mode()]));
   /** Server field paths: new people are nested under "person". */
   protected readonly errorPrefix = computed(() => (this.id() ? '' : 'person.'));
 
@@ -180,7 +132,7 @@ export class MemberEditPage {
       {
         childOf: mark('Will be added as a child of'),
         parentOf: mark('Will be added as a parent of'),
-        partnerOf: mark('Will be added as a partner of'),
+        partnerOf: mark('Will be added as the husband or wife of'),
       }[this.relation() ?? 'childOf'],
     ),
   );
@@ -205,13 +157,17 @@ export class MemberEditPage {
     try {
       if (id) {
         const m = await this.membersApi.get(familyId, id);
-        if (!m.viewerCan.update && !m.viewerCan.editOwn && !m.viewerCan.propose) {
-          this.loadError.set(t('You do not have permission to edit this profile.'));
+        if (!m.viewerCan.update) {
+          this.loadError.set(t('Only the family’s administrators can edit people.'));
           return;
         }
         this.existing.set(m);
         this.form.set(memberForm(m));
       } else {
+        if (!this.context.can('member.create')) {
+          this.loadError.set(t('Only the family’s administrators can add people.'));
+          return;
+        }
         this.form.set(memberForm());
         if (relativeId) {
           this.relative.set(await this.membersApi.get(familyId, relativeId));
@@ -233,37 +189,14 @@ export class MemberEditPage {
       return;
     }
     const family = this.context.active()!;
-    const note = this.note().trim() || undefined;
     this.busy.set(true);
     this.error.set(null);
-    this.nothingChanged.set(false);
     try {
       const existing = this.existing();
-      const mode = this.mode();
-      if (existing && mode === 'edit') {
+      if (existing) {
         const removePhoto = this.photo() === null ? { profilePhotoMediaId: null } : {};
-        await this.membersApi.update(family.id, existing.id, { ...memberInputFrom(f, existing), ...removePhoto, version: existing.version ?? 0 });
+        await this.membersApi.update(family.id, existing.id, { ...memberInputFrom(f), ...removePhoto, version: existing.version ?? 0 });
         await this.finish(family.id, existing);
-      } else if (existing) {
-        const changes: Record<string, unknown> = changedFields(f, existing);
-        if (this.photo() === null) changes['profilePhotoMediaId'] = null;
-        const newPhoto = this.photo() instanceof File;
-        const own = mode === 'own' ? Object.fromEntries(Object.entries(changes).filter(([k]) => OWN_PROFILE_FIELDS.has(k))) : {};
-        const proposed = Object.fromEntries(Object.entries(changes).filter(([k]) => !(k in own)));
-        if (!Object.keys(changes).length && !newPhoto) {
-          this.nothingChanged.set(true);
-          return;
-        }
-        if (Object.keys(own).length) {
-          await this.membersApi.update(family.id, existing.id, { ...own, version: existing.version ?? 0 });
-        }
-        if (Object.keys(proposed).length) {
-          const c = await this.collaboration.propose(family.id, { kind: 'member.update', targetId: existing.id, payload: proposed, note });
-          await this.savePhoto(family.id, existing);
-          await this.router.navigate(['/contributions'], { queryParams: { id: c.id } });
-        } else {
-          await this.finish(family.id, existing);
-        }
       } else {
         const body: CreateMemberRequest = { person: memberInputFrom(f) };
         const rel = this.relative();
@@ -271,11 +204,6 @@ export class MemberEditPage {
           const { subtype, verification } = this.linkForm.getRawValue();
           const link = { memberId: rel.id, subtype: subtype as never, verification };
           body.links = this.relation() === 'childOf' ? { parents: [link] } : this.relation() === 'parentOf' ? { children: [link] } : { partners: [link] };
-        }
-        if (mode === 'propose-create') {
-          const c = await this.collaboration.propose(family.id, { kind: 'member.create', payload: body as unknown as Record<string, unknown>, note });
-          await this.router.navigate(['/contributions'], { queryParams: { id: c.id } });
-          return;
         }
         const created = await this.membersApi.create(family.id, body);
         void this.context.refresh();
@@ -300,8 +228,8 @@ export class MemberEditPage {
     const file = this.photo();
     if (!(file instanceof File)) return null;
     try {
-      const media = await uploadProfilePhoto(this.archive, familyId, person, file);
-      return media.status === 'pending_approval' ? { tone: 'info', text: t('The photo was sent to a moderator. It appears once they approve it.') } : null;
+      await uploadProfilePhoto(this.archive, familyId, person, file);
+      return null;
     } catch (err) {
       return { tone: 'error', text: t('The details were saved, but the photo could not be added: {reason}', { reason: ApiError.from(err).message }) };
     }

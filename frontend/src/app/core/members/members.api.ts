@@ -6,7 +6,6 @@ import type {
   ApiSuccess,
   CreateMemberRequest,
   CreateRelationshipRequest,
-  KinshipResult,
   ListMembersQuery,
   MemberView,
   PersonCard,
@@ -30,6 +29,11 @@ export class MembersApi {
 
   list(familyId: string, query: ListMembersQuery) {
     return firstValueFrom(this.http.get<ApiPage<PersonCard>>(`${base(familyId)}/members`, { params: params(query) }));
+  }
+
+  /** Detail names already used in the family, most used first. */
+  async attributeNames(familyId: string) {
+    return (await firstValueFrom(this.http.get<ApiSuccess<string[]>>(`${base(familyId)}/attribute-names`))).data;
   }
 
   async search(familyId: string, q: string) {
@@ -69,7 +73,5 @@ export class MembersApi {
   }
 
   /** How two people are related (kinship term, path, common ancestors). */
-  async between(familyId: string, a: string, b: string) {
-    return (await firstValueFrom(this.http.get<ApiSuccess<KinshipResult>>(`${base(familyId)}/relationships/between`, { params: params({ a, b }) }))).data;
-  }
+
 }

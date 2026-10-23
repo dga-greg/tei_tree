@@ -69,12 +69,8 @@ heroku config:set \
 You can copy the values from your `backend/.env`. Never commit that file. Keep `MFA_ENCRYPTION_KEY` once set:
 changing it turns two-step sign-in off for everyone.
 
-Ceremony announcements by SMS: `GIANT_AUTH` and `GIANT_SENDER_ID` (plus `GIANT_USERNAME`, `GIANT_PASSWORD`), and for WhatsApp `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID`; see [MESSAGING.md](MESSAGING.md).
-
-Optional, as on your laptop: `IDLE_TIMEOUT_MINUTES` (sign-out after this long without activity, default 30; 0 turns it off; people who tick "Keep me signed in on this device" are not affected), `MAP_TILE_URL`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (the redirect URI becomes
-`https://mensah-family.herokuapp.com/api/v1/auth/google/callback`), `TRANSCRIPTION_URL` / `TRANSCRIPTION_API_KEY`,
-`WEB_PUSH_PUBLIC_KEY` / `WEB_PUSH_PRIVATE_KEY`. Images, recordings and map tiles are allowed by the page's security
-policy automatically, from `S3_ENDPOINT` and `MAP_TILE_URL`.
+Optional, as on your laptop: `IDLE_TIMEOUT_MINUTES` (sign-out after this long without activity, default 30; 0 turns it off; people who tick "Keep me signed in on this device" are not affected), `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (the redirect URI becomes
+`https://mensah-family.herokuapp.com/api/v1/auth/google/callback`). Photos are allowed by the page's security policy automatically, from `S3_ENDPOINT`.
 
 **MongoDB Atlas:** Heroku's addresses change, so in Atlas → Network Access allow `0.0.0.0/0` (access is still
 protected by the database user and password), or use a fixed-IP add-on.

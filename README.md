@@ -1,10 +1,8 @@
-# Family Heritage — Family Tree & Generational History
+# Family Tree — family register with family IDs
 
-A platform for families to document their ancestry, preserve their history and explore relationships across unlimited generations. The founding ancestor is **Generation 1**; every verified descendant's generation is calculated automatically.
+A family register for administrators: record every person in the family, link parents, children and husbands or wives, and see the whole family as a tree. Every person linked to the family gets a **family ID**: the family head is **G1**, their children **G1.1, G1.2, G1.3**, grandchildren **G1.2.1** and so on, and a husband or wife gets their partner's ID with **-W1 / -H1** (e.g. G1.2-W1).
 
-> **Status: all eight phases complete.** Authentication and roles; families, people and relationships with privacy and integrity checks; automatic generation numbers with conflict review and dashboards; an interactive D3 family tree with search, highlighting, export and branches; a relationship finder that names how any two relatives are related and shows the path; invitations, suggestions with moderator review, profile claims, roles and a change history with undo; a family archive of photos, documents and recordings, stories and oral histories, and a family timeline; GEDCOM/JSON export, account and family deletion, abuse reports, a security review, performance checks, an end-to-end suite, container images and CI/CD.
->
-> **Second roadmap (phases 9–14) complete:** GEDCOM import with matching against people already in the family and undo; a duplicate finder and field-by-field merging with undo; a family calendar of birthdays, anniversaries, remembrance days and events, a weekly e-mail and morning phone notifications, and an installable app that opens offline; lineage (abusua, ntoro or clan, and totems) inherited through mothers and fathers and shown in the tree; ceremonies with programmes and roles; family funds with dues, contributions and treasurers; places on a map with the family's moves between them, people tagged in photos, and transcripts and translations of recordings; two-step sign-in with an authenticator app and sign-in with Google; a printable family book (PDF) and the interface in English and French, with draft Twi, Ga, Ewe and Hausa translations. See the [roadmap](docs/07-ROADMAP.md) and the phase reports in [docs/](docs/).
+The app has four menus — **Dashboard**, **Family Tree**, **Family Members** and **Settings** — and is in English. See [docs/FAMILY-IDS.md](docs/FAMILY-IDS.md) for how IDs are given and what each person records.
 
 ## Documentation
 
@@ -16,7 +14,7 @@ A platform for families to document their ancestry, preserve their history and e
 | [04 — Generation & relationship engines](docs/04-GENERATION-ENGINE.md) | Generation calculation, conflicts, kinship classification |
 | [05 — REST API](docs/05-API.md) | Conventions and every endpoint, with implementation status |
 | [06 — UI architecture](docs/06-UI-ARCHITECTURE.md) | Component tree, state, HTTP layer, tree visualisation design |
-| [07 — Roadmap](docs/07-ROADMAP.md) | Phases and exit criteria |
+| [Family IDs and member details](docs/FAMILY-IDS.md) | What this build records and how family IDs are given |
 | [Deployment](docs/DEPLOYMENT.md) | Container images, configuration, operations |
 | [Security review](docs/SECURITY-REVIEW.md) | What was checked, fixed and accepted |
 
